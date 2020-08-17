@@ -12,6 +12,6 @@ setuptools.setup(
     ],
     entry_points='''
         [console_scripts]
-        data=thesis.util.iris_segmentation:data
+        data=thesis.util.data_tool:data
     '''
 )
