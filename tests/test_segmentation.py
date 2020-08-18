@@ -4,6 +4,10 @@ from thesis.segmentation import *
 from thesis.geometry import *
 
 
+def test_iris_code_produces_result():
+    ...
+
+
 def test_segmentation_mask_draws_successfully():
     inner = [
         [0, 1],

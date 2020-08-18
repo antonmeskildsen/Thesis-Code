@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import cv2 as cv
 import numpy as np
+from skimage.filters import gabor
 
 from thesis.geometry import Quadratic, Ellipse, Mask
 
@@ -47,7 +48,10 @@ class IrisImage:
 
     def __init__(self, segmentation: IrisSegmentation, image: np.ndarray):
         self.segmentation = segmentation
-        self.image = image
+        if len(image.shape) > 2:
+            self.image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        else:
+            self.image = image
         self.mask = segmentation.get_mask((image.shape[1], image.shape[0]))
 
     def polar_image(self, angular_resolution, linear_resolution) -> np.ndarray:
@@ -60,11 +64,7 @@ class IrisImage:
         Returns:
 
         """
-        if len(self.image.shape) == 2:
-            output = np.zeros((linear_resolution, angular_resolution), np.uint8)
-        else:
-            output = np.zeros((linear_resolution, angular_resolution, self.image.shape[2]), np.uint8)
-
+        output = np.zeros((linear_resolution, angular_resolution), np.uint8)
         output_mask = np.zeros((linear_resolution, angular_resolution), np.uint8)
 
         angle_steps = np.linspace(0, 2 * np.pi, angular_resolution)
@@ -72,7 +72,26 @@ class IrisImage:
             start, stop = self.segmentation.intersect_angle(theta)
             x_coord, y_coord = start.linear_interpolation(stop, linear_resolution)
             for j, (x, y) in enumerate(zip(x_coord, y_coord)):
+                if x < 0 or y < 0 or x >= self.image.shape[1] or y >= self.image.shape[0]:
+                    continue
                 output[j, i] = self.image[int(y), int(x)]
                 output_mask[j, i] = self.mask[int(y), int(x)]
 
         return output, output_mask
+
+
+class IrisCode:
+    def __init__(self, iris_image: IrisImage,
+                 scales: int = 3,
+                 angles: int = 3,
+                 frequency_scale_base=1):
+        polar, polar_mask = iris_image.polar_image(10, 10)
+
+        res = []
+        for s in range(1, scales + 1):
+            frequency_scale = frequency_scale_base / 2 ** s
+            for t in np.linspace(0, np.pi, angles):
+                real, imag = gabor(polar, frequency_scale, theta=t, bandwidth=1)
+                res.extend(real.reshape(-1))
+
+        self.code = res
