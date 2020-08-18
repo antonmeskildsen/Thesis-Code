@@ -14,7 +14,7 @@ from tqdm import tqdm
 import json
 import click
 
-from thesis.segmentation import IrisSegmentation, IrisImage
+from thesis.segmentation import IrisSegmentation, IrisImage, IrisCode
 
 
 class EyeSide(str, Enum):
@@ -166,6 +166,14 @@ def preview(path):
             cv.imshow('Polar', polar)
             masked = cv.bitwise_and(polar, polar, mask=mask * 255)
             cv.imshow('PolarMask', masked)
+
+            code = IrisCode(iris_img)
+
+            code_img = np.array(code.code).reshape((20, -1))
+            print(code.code)
+
+            cv.imshow('Code', code_img)
+
             cv.waitKey(100)
 
 
