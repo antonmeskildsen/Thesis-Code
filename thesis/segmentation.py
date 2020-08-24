@@ -16,7 +16,6 @@ class IrisSegmentation(Mask):
 
     @staticmethod
     def from_json(obj):
-        print(len(obj['upper']))
         return IrisSegmentation(
             inner=Ellipse.from_points(obj['inner']),
             outer=Ellipse.from_points(obj['outer']),
@@ -84,14 +83,20 @@ class IrisCode:
     def __init__(self, iris_image: IrisImage,
                  scales: int = 3,
                  angles: int = 3,
-                 frequency_scale_base=1):
-        polar, polar_mask = iris_image.polar_image(10, 10)
-
+                 frequency_scale_base=2):
+        polar, polar_mask = iris_image.polar_image(20, 5)
+        polar = np.float64(polar)
         res = []
         for s in range(1, scales + 1):
             frequency_scale = frequency_scale_base / 2 ** s
-            for t in np.linspace(0, np.pi, angles):
-                real, imag = gabor(polar, frequency_scale, theta=t, bandwidth=1)
+            for t in np.linspace(0, np.pi - (np.pi/angles), angles):
+                real, imag = gabor(polar, frequency_scale, theta=t, bandwidth=0.1, mode='wrap')
+                real = np.sign(real)
+                imag = np.sign(imag)
+                real[polar_mask == 0] = 0
+                imag[polar_mask == 0] = 0
                 res.extend(real.reshape(-1))
+                res.extend(imag.reshape(-1))
 
-        self.code = res
+        self.code = np.array(res)
+        self.mask_bits = (polar_mask == 1).sum() * scales * angles * 2

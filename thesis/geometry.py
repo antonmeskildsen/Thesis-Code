@@ -58,12 +58,11 @@ class Quadratic(Mask):
         mat = np.vstack((x_in**2, x_in, np.ones(len(points)))).T
         y = points[:, 1]
 
-        solution = np.linalg.lstsq(mat, y)[0]
+        solution = np.linalg.lstsq(mat, y, rcond=None)[0]
         return Quadratic(solution[0], solution[1], solution[2])
 
     def get_mask(self, size):
         mask = self.empty(size)
-        print(size)
         for x in range(0, size[0]):
             mask[int(self(x)):, x] = 1
         return mask
