@@ -79,24 +79,63 @@ class IrisImage:
         return output, output_mask
 
 
+@dataclass
 class IrisCode:
-    def __init__(self, iris_image: IrisImage,
-                 scales: int = 3,
+    code: np.ndarray
+    # def __init__(self, iris_image: IrisImage,
+    #              scales: int = 3,
+    #              angles: int = 3,
+    #              frequency_scale_base=2):
+    #     polar, polar_mask = iris_image.polar_image(20, 5)
+    #     polar = np.float64(polar)
+    #     res = []
+    #     for s in range(1, scales + 1):
+    #         frequency_scale = frequency_scale_base / 2 ** s
+    #         for t in np.linspace(0, np.pi - (np.pi / angles), angles):
+    #             real, imag = gabor(polar, frequency_scale, theta=t, bandwidth=0.1, mode='wrap')
+    #             real = np.sign(real)
+    #             imag = np.sign(imag)
+    #             real[polar_mask == 0] = 0
+    #             imag[polar_mask == 0] = 0
+    #             res.extend(real.reshape(-1))
+    #             res.extend(imag.reshape(-1))
+    #
+    #     self.code = np.array(res)
+
+    def dist(self, other):
+        n = ((self.code * other.code) == 0).sum()
+        self.code[other.code == 0] = 0
+        other.code[self.code == 0] = 0
+        return (self.code != other.code).sum() / (len(self) - n)
+
+    def __len__(self):
+        return self.code.size
+
+
+class IrisCodeEncoder:
+    def __init__(self, scales: int = 3,
                  angles: int = 3,
                  frequency_scale_base=2):
-        polar, polar_mask = iris_image.polar_image(20, 5)
-        polar = np.float64(polar)
-        res = []
+        self.kernels = []
         for s in range(1, scales + 1):
             frequency_scale = frequency_scale_base / 2 ** s
-            for t in np.linspace(0, np.pi - (np.pi/angles), angles):
-                real, imag = gabor(polar, frequency_scale, theta=t, bandwidth=0.1, mode='wrap')
-                real = np.sign(real)
-                imag = np.sign(imag)
-                real[polar_mask == 0] = 0
-                imag[polar_mask == 0] = 0
-                res.extend(real.reshape(-1))
-                res.extend(imag.reshape(-1))
+            for t in np.linspace(0, np.pi - (np.pi / angles), angles):
+                kernel = cv.getGaborKernel((3, 3), sigma=1, theta=t, lambd=frequency_scale, gamma=1, psi=0, ktype=cv.CV_64F)
+                self.kernels.append(kernel)
+                kernel = cv.getGaborKernel((3, 3), sigma=1, theta=t+np.pi/2, lambd=frequency_scale, gamma=1, psi=0,
+                                           ktype=cv.CV_64F)
+                self.kernels.append(kernel)
 
-        self.code = np.array(res)
-        self.mask_bits = (polar_mask == 1).sum() * scales * angles * 2
+    def encode(self, image):
+        polar, polar_mask = image.polar_image(20, 5)
+        polar = np.float64(polar)
+        res = []
+        for k in self.kernels:
+            f = cv.filter2D(polar, cv.CV_64F, k)
+            f = np.sign(f)
+            f[polar_mask == 0] = 0
+            res.extend(f.reshape(-1))
+
+        return IrisCode(np.array(res))
+
+
