@@ -7,7 +7,7 @@ import numpy as np
 import cv2 as cv
 from glob2 import glob
 
-from thesis.segmentation import IrisSegmentation, IrisImage, IrisCode
+from thesis.segmentation import IrisSegmentation, IrisImage, IrisCode, IrisCodeEncoder
 
 "# Explorer"
 
@@ -18,12 +18,13 @@ names = [os.path.basename(p).split('.')[0] for p in files]
 
 dataset = st.selectbox('Dataset', names)
 
+encoder = IrisCodeEncoder(3, 5, 2)
 
 def get_code(img, info):
     seg = IrisSegmentation.from_json(info)
     iris_img = IrisImage(seg, img)
     polar, _ = iris_img.polar_image(50, 30)
-    ic = IrisCode(iris_img, 3, 5)
+    ic = encoder.encode(iris_img)
     code = ic.code
     saved = np.array(code)
     code = code / 2 + 0.5
@@ -31,11 +32,11 @@ def get_code(img, info):
     st.image([img, polar, code], ['regular', 'polar', 'code'])
     return saved, ic.mask_bits
 
-def create_code(item, frequency_scales, angles):
+def create_code(item):
     seg = IrisSegmentation.from_json(item['points'])
     img = cv.imread(item['image'], cv.IMREAD_GRAYSCALE)
     iris_img = IrisImage(seg, img)
-    ic = IrisCode(iris_img, frequency_scales, angles)
+    ic = encoder.encode(iris_img)
     return ic.code
 
 
@@ -44,16 +45,20 @@ def create_codes(data):
     bar = st.progress(0)
     res = []
     for i, item in enumerate(data):
-        res.append(create_code(item, 3, 5))
+        res.append(create_code(item))
         bar.progress(i/len(data))
     return res
 
 
-def hamming_distance(c1, c2):
+def hamming_distance(c1: np.ndarray, c2: np.ndarray):
     n = ((c1 * c2) == 0).sum()
     c1[c2 == 0] = 0
     c2[c1 == 0] = 0
-    return (c1 != c2).sum() / (c1.size - n)
+    div = c1.size - n
+    if div == 0:
+        return 0
+    else:
+        return (c1 != c2).sum() / (c1.size - n)
 
 
 with open(os.path.join(base, f'{dataset}.json')) as f:
@@ -90,10 +95,12 @@ with open(os.path.join(base, f'{dataset}.json')) as f:
     if st.checkbox('Stats'):
         codes = create_codes(data['data'])
 
+        bar = st.progress(0)
         n = len(codes)
         distance_matrix = np.zeros((n, n))
         same_mask = np.zeros((n, n), np.bool)
         for i in range(n):
+            bar.progress(i/n)
             for j in range(n):
                 distance_matrix[i, j] = hamming_distance(codes[i], codes[j])
                 in_data = data['data']
