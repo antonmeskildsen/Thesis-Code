@@ -75,6 +75,10 @@ class Ellipse(Mask):
     angle: float
 
     @staticmethod
+    def from_dict(data: dict):
+        return Ellipse(Vec2(data['cx'], data['cy']), Vec2(data['ax'], data['ay']), data['angle'])
+
+    @staticmethod
     def from_points(points) -> Ellipse:
         if len(points) < 5:
             raise ValueError("Cannot infer ellipse from less than 5 points.")

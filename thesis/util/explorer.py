@@ -7,46 +7,58 @@ import numpy as np
 import cv2 as cv
 from glob2 import glob
 
-from thesis.segmentation import IrisSegmentation, IrisImage, IrisCode, IrisCodeEncoder
+from eyeinfo import IrisImage, IrisEncoder, IrisSegmentationDescriptor
 
 "# Explorer"
 
-base = '/home/anton/data/eyedata/iris'
+# base = '/home/anton/data/eyedata/iris'
+base = '/Users/Anton/Desktop/data/iris'
 
 files = glob(os.path.join(base, '*.json'))
 names = [os.path.basename(p).split('.')[0] for p in files]
 
 dataset = st.selectbox('Dataset', names)
 
-encoder = IrisCodeEncoder(3, 5, 2)
+encoder = IrisEncoder(3, 5, 2)
+
 
 def get_code(img, info):
-    seg = IrisSegmentation.from_json(info)
+    inner = info['inner']
+    outer = info['outer']
+    lower = info['lower']
+    upper = info['upper']
+    seg = IrisSegmentationDescriptor.from_points(inner, outer, lower, upper)
+    # m = seg.get_mask((250, 250))
     iris_img = IrisImage(seg, img)
-    polar, _ = iris_img.polar_image(50, 30)
-    ic = encoder.encode(iris_img)
-    code = ic.code
+    polar, _ = iris_img.to_polar(50, 30)
+    ic = encoder(iris_img)
+    code = np.array(ic.code)
     saved = np.array(code)
     code = code / 2 + 0.5
     code = np.array(code).reshape((30, -1))
-    st.image([img, polar, code], ['regular', 'polar', 'code'])
-    return saved, ic.mask_bits
+    st.image([iris_img.image, iris_img.mask*255, code], ['regular', 'polar', 'code'])
+    return saved
+
 
 def create_code(item):
-    seg = IrisSegmentation.from_json(item['points'])
+    inner = info['inner']
+    outer = info['outer']
+    lower = info['lower']
+    upper = info['upper']
+    seg = IrisSegmentationDescriptor.from_points(inner, outer, lower, upper)
     img = cv.imread(item['image'], cv.IMREAD_GRAYSCALE)
     iris_img = IrisImage(seg, img)
-    ic = encoder.encode(iris_img)
+    ic = encoder(iris_img)
     return ic.code
 
 
-@st.cache(suppress_st_warning=True)
+# @st.cache(suppress_st_warning=True)
 def create_codes(data):
     bar = st.progress(0)
     res = []
     for i, item in enumerate(data):
         res.append(create_code(item))
-        bar.progress(i/len(data))
+        bar.progress(i / len(data))
     return res
 
 
@@ -80,16 +92,19 @@ with open(os.path.join(base, f'{dataset}.json')) as f:
         info = data['data'][index]
         info2 = data['data'][index2]
         img = cv.imread(info['image'], cv.IMREAD_GRAYSCALE)
-        img2 = cv.imread(info2['image'], cv.IMREAD_GRAYSCALE)
+        # img2 = cv.imread(info2['image'], cv.IMREAD_GRAYSCALE)
 
-        c1, b = get_code(img, info['points'])
-        c2, b = get_code(img2, info2['points'])
-        n = ((c1 * c2) == 0).sum()
-        c1[c2 == 0] = 0
-        c2[c1 == 0] = 0
-        dist = (c1 != c2).sum() / (c1.size - n)
+        # if img is None or img2 is None:
+        #     raise IOError("Could not open image")
+
+        c1 = get_code(img, info['points'])
+        # c2 = get_code(img2, info2['points'])
+        # n = ((c1 * c2) == 0).sum()
+        # c1[c2 == 0] = 0
+        # c2[c1 == 0] = 0
+        # dist = (c1 != c2).sum() / (c1.size - n)
         # dist = np.linalg.norm(np.array(c1, np.float64)-np.array(c2, np.float64))
-        f'Distance: {dist}'
+        # f'Distance: {dist}'
 
     "## Code generation"
     if st.checkbox('Stats'):
@@ -100,7 +115,7 @@ with open(os.path.join(base, f'{dataset}.json')) as f:
         distance_matrix = np.zeros((n, n))
         same_mask = np.zeros((n, n), np.bool)
         for i in range(n):
-            bar.progress(i/n)
+            bar.progress(i / n)
             for j in range(n):
                 distance_matrix[i, j] = hamming_distance(codes[i], codes[j])
                 in_data = data['data']

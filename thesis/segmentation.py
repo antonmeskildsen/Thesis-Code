@@ -1,10 +1,13 @@
+from __future__ import annotations
 from dataclasses import dataclass
+from typing import List
+import json
 
 import cv2 as cv
 import numpy as np
 from skimage.filters import gabor
 
-from thesis.geometry import Quadratic, Ellipse, Mask
+from thesis.geometry import Quadratic, Ellipse, Mask, Vec2
 
 
 @dataclass
@@ -15,7 +18,7 @@ class IrisSegmentation(Mask):
     lower_eyelid: Quadratic
 
     @staticmethod
-    def from_json(obj):
+    def from_dict(obj: dict) -> IrisSegmentation:
         return IrisSegmentation(
             inner=Ellipse.from_points(obj['inner']),
             outer=Ellipse.from_points(obj['outer']),
@@ -23,7 +26,7 @@ class IrisSegmentation(Mask):
             lower_eyelid=Quadratic.from_points_least_sq(obj['lower'])
         )
 
-    def get_mask(self, size):
+    def get_mask(self, size: (int, int)) -> np.ndarray:
         mask_inner = self.inner.get_mask(size)
         mask_outer = self.outer.get_mask(size)
         mask_upper = self.upper_eyelid.get_mask(size)
@@ -33,7 +36,7 @@ class IrisSegmentation(Mask):
         with_eyelids = base * mask_upper * mask_lower
         return with_eyelids
 
-    def intersect_angle(self, theta):
+    def intersect_angle(self, theta: float) -> (Vec2, Vec2):
         p1 = self.inner.intersect_angle(theta)
         p2 = self.outer.intersect_angle(theta)
         return p1, p2
@@ -52,6 +55,12 @@ class IrisImage:
         else:
             self.image = image
         self.mask = segmentation.get_mask((image.shape[1], image.shape[0]))
+
+    @staticmethod
+    def from_dict(data: dict) -> IrisImage:
+        segmentation = IrisSegmentation.from_dict(data['points'])
+        image = cv.imread(data['image'])
+        return IrisImage(segmentation, image)
 
     def polar_image(self, angular_resolution, linear_resolution) -> np.ndarray:
         """Create polar image.
