@@ -1,0 +1,20 @@
+- bilateral_filter:
+    parameters:
+      - ksize:
+          samples: samples_step
+          params:
+            start: 3,
+            stop: 21,
+            step: 2
+      - sigma_s:
+          samples: samples_num
+          params:
+            start: 5,
+            stop: 40,
+            step: 5
+      - sigma_c:
+          samples: samples_num
+          params:
+            start: 5,
+            stop: 40,
+            step: 5

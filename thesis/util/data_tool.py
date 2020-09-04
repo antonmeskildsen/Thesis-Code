@@ -121,7 +121,12 @@ def data():
     pass
 
 
-@data.command()
+@data.group()
+def iris():
+    pass
+
+
+@iris.command()
 @click.argument('path')
 @click.argument('dataset')
 @click.argument('output')
@@ -154,13 +159,12 @@ def preview(path):
                 continue
             point = data[index]
             img = cv.imread(point['image'])
-            seg = IrisSegmentation.from_json(point['points'])
+            seg = IrisSegmentation.from_dict(point['points'])
             mask = seg.get_mask((img.shape[1], img.shape[0]))
             iris_img = IrisImage(seg, img)
 
             masked = cv.bitwise_and(img, img, mask=iris_img.mask * 255)
             cv.imshow('Preview', masked)
-
 
             polar, mask = iris_img.polar_image(200, 100)
             cv.imshow('Polar', polar)
@@ -175,6 +179,56 @@ def preview(path):
             cv.imshow('Code', code_img)
 
             cv.waitKey(100)
+
+
+@data.group()
+def track():
+    pass
+
+
+def combine_json(glints: list, pupils: list, positions: list, calibration_samples: int) -> dict:
+    if len(glints) != len(pupils) != len(positions):
+        raise ValueError("Data files contain different numbers of elements.")
+
+    combined = [{
+        'image': f'{i}.jpg',
+        'glints': img_glints,
+        'pupil': pupil,
+        'position': position
+    } for i, (img_glints, pupil, position) in enumerate(zip(glints, pupils, positions))]
+
+    return {
+        'calibration': combined[:calibration_samples],
+        'test': combined[calibration_samples:]
+    }
+
+
+@track.command()
+@click.argument('path')
+@click.argument('calibration_samples', type=int)
+def create(path: str, calibration_samples: int):
+    """Create single json file.
+
+    PATH: Path to folder containing images and json files.
+    OUTPUT: Filename of output json file.
+    CALIBRATION_SAMPLES: Number of images used for calibration."""
+    glints_path = os.path.join(path, 'glints.json')
+    pupils_path = os.path.join(path, 'pupils.json')
+    positions_path = os.path.join(path, 'positions.json')
+    with open(glints_path) as glints_file, \
+            open(pupils_path) as pupils_file, \
+            open(positions_path) as positions_file:
+        glints = json.load(glints_file)
+        pupils = json.load(pupils_file)
+        positions = json.load(positions_file)
+
+        output_data = combine_json(glints, pupils, positions, path)
+
+        with open(os.path.join(path, 'data.json'), 'w') as output_file:
+            json.dump(output_data, output_file, indent=4)
+
+        print("Created data.json")
+
 
 
 if __name__ == '__main__':
