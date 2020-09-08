@@ -1,14 +1,11 @@
-from itertools import product
 from dataclasses import dataclass
 from typing import *
 from tqdm import tqdm
 
 import numpy as np
 from torch.utils.data import Dataset
-from typing_extensions import Protocol
 
-from thesis.optim.loss import LossFunction
-from thesis.optim.sampling import Strategy
+from thesis.optim_old.loss import LossFunction
 
 from thesis.data import SegmentationDataset, GazeDataset
 

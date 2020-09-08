@@ -6,7 +6,7 @@ import cv2 as cv
 import numpy as np
 from typing_extensions import Protocol
 
-from thesis.optim.types import *
+from thesis.optim_old.types import *
 from thesis.information.entropy import grad_entropy, grad_hist
 from thesis.fnc.features import extract_feature
 from eyelab.fnc.matching import calc_hamming_dist

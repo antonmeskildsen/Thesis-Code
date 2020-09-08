@@ -1,6 +1,7 @@
 import enum
 import os
 import re
+import random
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
@@ -130,7 +131,8 @@ def iris():
 @click.argument('path')
 @click.argument('dataset')
 @click.argument('output')
-def create(path, dataset, output):
+@click.option('-l', '--limit', type=int, default=0)
+def create(path, dataset, output, limit):
     """Create json file containing dataset points and image file paths.
 
     PATH is the base path to the "iris" dataset.
@@ -140,6 +142,8 @@ def create(path, dataset, output):
     OUTPUT is the path to the resulting json file.
     """
     dset = get_segmented_images(dataset, path)
+    if limit > 0:
+        dset['data'] = random.sample(dset['data'], limit)
     with open(output, 'w') as f:
         json.dump(dset, f)
 
@@ -222,7 +226,7 @@ def create(path: str, calibration_samples: int):
         pupils = json.load(pupils_file)
         positions = json.load(positions_file)
 
-        output_data = combine_json(glints, pupils, positions, path)
+        output_data = combine_json(glints, pupils, positions, calibration_samples)
 
         with open(os.path.join(path, 'data.json'), 'w') as output_file:
             json.dump(output_data, output_file, indent=4)
