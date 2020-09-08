@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Tuple, List
 from typing_extensions import Protocol
 import numpy as np
 import cv2 as cv
@@ -8,8 +8,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import Pipeline
 
-from eyelab.tracking import features
-from eyeinfo.features import Else
+from thesis.tracking import features
 
 
 class FeatureTransformer(Protocol):
@@ -30,8 +29,7 @@ class GazeModel:
         """Calibrate the model.
 
         Args:
-            images (array-like): Images to use for calibration.
-            gaze_positions (array-like): Gaze values for the images.
+            samples:
         """
         ...
 
@@ -40,7 +38,7 @@ class GazeModel:
         """Predict gaze from an input image.
 
         Args:
-            image (array-like): Single image or list of images to predict.
+            images (array-like): Single image or list of images to predict.
 
         Returns:
             Tuple[float, float]: ...
@@ -102,13 +100,24 @@ def hom(points):
 
 
 class BasicGaze(GazeModel):
-    def __init__(self, model: Pipeline, glint_args):
+    def __init__(self, glint_args=None, model: Pipeline = None):
+        if glint_args is None:
+            self.glint_args = {}
+        else:
+            self.glint_args = glint_args
+        if model is None:
+            model = Pipeline([
+                ('design matrix', PolynomialFeatures(1)),
+                ('model', LinearRegression())
+            ])
+
         super().__init__()
         self.model = model
-        self.detector = Else()
-        self.glint_args = glint_args
 
     def _preprocess(self, images):
+        images = np.array(images)
+        if len(images.shape) == 2:
+            images = [images]
 
         pupils = np.array([features.pupil_detector(img) for img in images])
 
@@ -119,13 +128,12 @@ class BasicGaze(GazeModel):
             for img, center in zip(images, centers)
         ]
 
-
-        #nan_removed = np.array([g for g in glints if ~np.isnan(g).any()])
-        #avg = nan_removed.mean(axis=0)
+        # nan_removed = np.array([g for g in glints if ~np.isnan(g).any()])
+        # avg = nan_removed.mean(axis=0)
         normed = []
         for i, (c, g) in enumerate(zip(centers, glints)):
             # print(i)
-            normed.append([c[0]-g[0, 0], c[1]-g[0, 1]])
+            normed.append([c[0] - g[0, 0], c[1] - g[0, 1]])
 
         # print(normed)
 
@@ -157,16 +165,15 @@ class BasicGaze(GazeModel):
         #         # st.write(aff)
         #         p = aff.dot(hom(p))
 
-            # if np.isnan(g).any():
-            #     normed.append(c - avg)
-            # else:
-            #     normed.append(c - g)
-        #print(centers)
+        # if np.isnan(g).any():
+        #     normed.append(c - avg)
+        # else:
+        #     normed.append(c - g)
+        # print(centers)
 
         return np.array(normed)
 
     def calibrate(self, images, gaze_positions):
-        import streamlit as st
         pupil = self._preprocess(images)
         norm_pos = features.normalize_coordinates(gaze_positions, 2160, 3840)
         self.model.fit(pupil, norm_pos)
@@ -174,7 +181,7 @@ class BasicGaze(GazeModel):
     def predict(self, images):
         pupil = self._preprocess(images)
         norm_predict = self.model.predict(pupil)
-        return norm_predict #features.unnormalize_coordinates(norm_predict, 2160, 3840)
+        return norm_predict  # features.unnormalize_coordinates(norm_predict, 2160, 3840)
 
     def score(self, images, gaze_positions):
         pupil = self._preprocess(images)

@@ -10,15 +10,17 @@ def pupil_detector(input, debug=False):
 
     Returns: A pupil candidate in OpenCV ellipse format.
     """
-    _, thresh = cv.threshold(input, 55, 255, cv.THRESH_BINARY_INV)
-
+    _, thresh = cv.threshold(input, 80, 255, cv.THRESH_BINARY_INV)
     contours, _ = cv.findContours(thresh, cv.RETR_LIST,
                                   cv.CHAIN_APPROX_SIMPLE)
 
     if len(contours) == 0:
         return [-1, -1, -1, -1, -1]
 
-    contours = filter(lambda x: ratio(x) > 0.5, contours)
+    contours = list(filter(lambda x: ratio(x) > 0.5, contours))
+
+    if len(contours) == 0:
+        return [-1, -1, -1, -1, -1]
 
     best = sorted(contours,
                   key=lambda c: cv.contourArea(c),
@@ -97,7 +99,7 @@ def find_glints(gray, center, *,
 
 
 def normalize_coordinates(coordinates, height, width):
-    coordinates = np.copy(coordinates)
+    coordinates = np.float64(coordinates)
     coordinates[:, 0] /= height
     coordinates[:, 1] /= width
     return coordinates

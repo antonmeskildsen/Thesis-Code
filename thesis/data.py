@@ -9,6 +9,7 @@ import cv2 as cv
 
 from thesis.geometry import Ellipse
 from thesis.segmentation import IrisImage
+from thesis.tracking.gaze import GazeModel, BasicGaze
 
 
 @dataclass
@@ -20,7 +21,7 @@ class GazeImage:
 
     @staticmethod
     def from_json(path: str, data: dict):
-        image = cv.imread(os.path.join(path, data['image']))
+        image = cv.imread(os.path.join(path, data['image']), cv.IMREAD_GRAYSCALE)
         pupil = Ellipse.from_dict(data['pupil'])
         glints = data['glints']
         screen_position = data['position']
@@ -31,14 +32,21 @@ class GazeImage:
 class GazeDataset:
     calibration_samples: List[GazeImage]
     test_samples: List[GazeImage]
+    model: GazeModel
 
     @staticmethod
     def from_path(path: str):
         with open(os.path.join(path, 'data.json')) as file:
             data = json.load(file)
-            calibration_samples = map(lambda d: GazeImage.from_json(path, d), data['calibration'])
-            test_samples = map(lambda d: GazeImage.from_json(path, d), data['test'])
-            GazeDataset(list(calibration_samples), list(test_samples))
+            calibration_samples = list(map(lambda d: GazeImage.from_json(path, d), data['calibration']))
+            test_samples = list(map(lambda d: GazeImage.from_json(path, d), data['test']))
+
+            model = BasicGaze()
+            images = [s.image for s in calibration_samples]
+            gaze_positions = [s.screen_position for s in calibration_samples]
+            model.calibrate(images, gaze_positions)
+
+            return GazeDataset(calibration_samples, test_samples, model)
 
 
 @dataclass
