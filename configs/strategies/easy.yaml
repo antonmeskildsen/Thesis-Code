@@ -1,0 +1,18 @@
+bfilter:
+  sigma_s:
+    type: samples_num
+    start: 1
+    stop: 5
+    num: 10
+  sigma_c:
+    type: samples_num
+    start: 20
+    stop: 100
+    num: 5
+
+gfilter:
+  sigma:
+    type: samples_num
+    start: 1
+    stop: 5
+    num: 5

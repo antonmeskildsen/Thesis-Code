@@ -9,6 +9,7 @@ import numpy as np
 from thesis.data import SegmentationSample, GazeImage
 from thesis.information.entropy import gradient_histogram, histogram, entropy
 from thesis.tracking.gaze import GazeModel
+from thesis.tracking.features import normalize_coordinates
 
 
 def bilateral_filter(img, kernel_size, sigma_c, sigma_s):
@@ -61,7 +62,8 @@ class GazeAbsoluteAccuracy(Term[GazeImage]):
 
     def __call__(self, sample: GazeImage, filtered: np.ndarray) -> float:
         gaze = self.model.predict(filtered)
-        return np.linalg.norm(np.array(gaze) - np.array(sample.screen_position))
+        true = normalize_coordinates(np.array([sample.screen_position]), 2160, 3840)
+        return np.linalg.norm(np.array(gaze) - np.array(true))
 
 
 @dataclass

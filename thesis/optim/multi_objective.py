@@ -6,13 +6,14 @@ from tqdm import tqdm
 import numpy as np
 
 from thesis.data import SegmentationDataset, GazeDataset, SegmentationSample, GazeImage
-from thesis.tracking.gaze import GazeModel
-from thesis.optim.objective_terms import gradient_entropy, GazeAbsoluteAccuracy
+from thesis.information.entropy import gradient_histogram, histogram
+from thesis.optim.sampling import Sampler
+from thesis.optim.objective_terms import gradient_entropy, GazeAbsoluteAccuracy, AbsoluteEntropy
 
 
 class MultiObjectiveOptimizer:
     @abstractmethod
-    def run(self, *, status=False) -> Iterator:
+    def run(self, *, wrapper=None):
         ...
 
     @abstractmethod
@@ -50,13 +51,18 @@ class ObfuscationObjective(Objective):
     gaze_datasets: List[GazeDataset]
 
     def eval(self, params):
-        entropy = []
+        gradient_entropies = []
+        intensity_entropies = []
         gaze = []
+
+        grad_func = AbsoluteEntropy(gradient_histogram)
+        intensity_func = AbsoluteEntropy(histogram)
 
         for dataset in self.iris_datasets:
             for sample in dataset.samples:
                 output = self.filter(sample.image.image, **params)
-                entropy.append(gradient_entropy(output, sample.image.image))
+                gradient_entropies.append(grad_func(sample, output))
+                intensity_entropies.append(intensity_func(sample, output))
 
         for dataset in self.gaze_datasets:
             model = GazeAbsoluteAccuracy(dataset.model)
@@ -64,27 +70,38 @@ class ObfuscationObjective(Objective):
                 output = self.filter(sample.image, **params)
                 gaze.append(model(sample, output))
 
-        return np.mean(entropy), np.mean(gaze)
+        return {
+            'gradient_entropy': np.mean(gradient_entropies),
+            'gaze': np.mean(gaze)
+            # 'intensity_entropy': np.mean(intensity_entropies)
+        }
 
     def output_dimensions(self):
         return 2
 
 
 def dominates(y, y_mark):
+    y = np.array(y)
+    y_mark = np.array(y_mark)
     return np.all(y <= y_mark) and np.any(y < y_mark)
 
 
 @dataclass
+class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer, ABC):
+    ...
+
+
+@dataclass
 class NaiveMultiObjectiveOptimizer(MultiObjectiveOptimizer):
-    def __init__(self, objective: Objective, sampler: Iterator):
+    def __init__(self, objective: Objective, sampler: Sampler):
         self.objective = objective
         self.sampler = sampler
 
         self.results = []
 
-    def run(self, *, status=False):
-        if status:
-            iterator = tqdm(self.sampler)
+    def run(self, *, wrapper=None):
+        if wrapper is not None:
+            iterator = wrapper(self.sampler, len(self.sampler))
         else:
             iterator = self.sampler
 
@@ -93,11 +110,21 @@ class NaiveMultiObjectiveOptimizer(MultiObjectiveOptimizer):
             self.results.append((params, output))
 
     def metrics(self):
-        return np.array(self.results)
+        return self.results
 
     def pareto_frontier(self):
         pareto = []
-        for params, output in self.results:
-            if not any([dominates(output, output_mark) for _, output_mark in self.results]):
-                pareto.append((params, output))
+        for i, (params, output) in enumerate(self.results):
+            if not any([dominates(tuple(output_mark.values()), tuple(output.values())) for _, output_mark in
+                        self.results]):
+                # pareto.append((params, output))
+                pareto.append(i)
+
+        # d = len(self.results)
+        # domination_matrix = np.zeros((d, d))
+        # for i, (params, output) in enumerate(self.results):
+        #     for j, (params_mark, output_mark) in enumerate(self.results):
+        #         if dominates(tuple(output.values()), tuple(output_mark.values())):
+        #             domination_matrix[i, j] = 1
+        # print(domination_matrix)
         return pareto
