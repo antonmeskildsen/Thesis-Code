@@ -5,31 +5,34 @@ import os
 import json
 
 import numpy as np
+import pandas as pd
 import cv2 as cv
 
 from thesis.geometry import Ellipse
 from thesis.segmentation import IrisImage
 from thesis.tracking.gaze import GazeModel, BasicGaze
+from thesis.tracking.features import normalize_coordinates
 
 
 @dataclass
 class GazeImage:
     image: np.ndarray
-    pupil: Ellipse
-    glints: List[(float, float)]
+    # pupil: Ellipse
+    # glints: List[(float, float)]
     screen_position: (int, int)
 
     @staticmethod
     def from_json(path: str, data: dict):
         image = cv.imread(os.path.join(path, data['image']), cv.IMREAD_GRAYSCALE)
-        pupil = Ellipse.from_dict(data['pupil'])
-        glints = data['glints']
+        # pupil = Ellipse.from_dict(data['pupil'])
+        # glints = data['glints']
         screen_position = data['position']
-        return GazeImage(image, pupil, glints, screen_position)
+        return GazeImage(image, screen_position)
 
 
 @dataclass
 class GazeDataset:
+    name: str
     calibration_samples: List[GazeImage]
     test_samples: List[GazeImage]
     model: GazeModel
@@ -46,7 +49,18 @@ class GazeDataset:
             gaze_positions = [s.screen_position for s in calibration_samples]
             model.calibrate(images, gaze_positions)
 
-            return GazeDataset(calibration_samples, test_samples, model)
+            if 'name' in data:
+                name = data['name']
+            else:
+                name = 'unnamed'
+
+            # print(normalize_coordinates(gaze_positions, 2160, 3840))
+            # print(model.predict(images))
+
+            return GazeDataset(name, calibration_samples, test_samples, model)
+
+    def __repr__(self):
+        return f'calibration samples: {len(self.calibration_samples)}, test samples: {len(self.test_samples)}'
 
 
 @dataclass
@@ -66,6 +80,7 @@ class SegmentationSample:
 
 @dataclass
 class SegmentationDataset:
+    name: str
     samples: List[SegmentationSample]
 
     @staticmethod
@@ -73,4 +88,10 @@ class SegmentationDataset:
         with open(path) as file:
             data = json.load(file)
             images = map(SegmentationSample.from_dict, data['data'])
-            return SegmentationDataset(list(images))
+
+            if 'name' in data:
+                name = data['name']
+            else:
+                name = 'unnamed'
+
+            return SegmentationDataset(name, list(images))

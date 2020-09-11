@@ -191,15 +191,19 @@ def track():
 
 
 def combine_json(glints: list, pupils: list, positions: list, calibration_samples: int) -> dict:
-    if len(glints) != len(pupils) != len(positions):
-        raise ValueError("Data files contain different numbers of elements.")
+    # if len(glints) != len(pupils) != len(positions):
+    #     raise ValueError("Data files contain different numbers of elements.")
 
+    # combined = [{
+    #     'image': f'{i}.jpg',
+    #     'glints': img_glints,
+    #     'pupil': pupil,
+    #     'position': position
+    # } for i, (img_glints, pupil, position) in enumerate(zip(glints, pupils, positions))]
     combined = [{
         'image': f'{i}.jpg',
-        'glints': img_glints,
-        'pupil': pupil,
         'position': position
-    } for i, (img_glints, pupil, position) in enumerate(zip(glints, pupils, positions))]
+    } for i, position in enumerate(positions)]
 
     return {
         'calibration': combined[:calibration_samples],
@@ -216,15 +220,18 @@ def create(path: str, calibration_samples: int):
     PATH: Path to folder containing images and json files.
     OUTPUT: Filename of output json file.
     CALIBRATION_SAMPLES: Number of images used for calibration."""
+
     glints_path = os.path.join(path, 'glints.json')
     pupils_path = os.path.join(path, 'pupils.json')
     positions_path = os.path.join(path, 'positions.json')
-    with open(glints_path) as glints_file, \
-            open(pupils_path) as pupils_file, \
-            open(positions_path) as positions_file:
-        glints = json.load(glints_file)
-        pupils = json.load(pupils_file)
+    # open(glints_path) as glints_file, open(pupils_path) as pupils_file,
+    with open(positions_path) as positions_file:
+        glints = None
+        pupils = None
+        # glints = json.load(glints_file)
+        # pupils = json.load(pupils_file)
         positions = json.load(positions_file)
+
 
         output_data = combine_json(glints, pupils, positions, calibration_samples)
 
@@ -232,7 +239,6 @@ def create(path: str, calibration_samples: int):
             json.dump(output_data, output_file, indent=4)
 
         print("Created data.json")
-
 
 
 if __name__ == '__main__':

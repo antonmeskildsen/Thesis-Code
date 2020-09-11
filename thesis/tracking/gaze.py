@@ -107,7 +107,7 @@ class BasicGaze(GazeModel):
             self.glint_args = glint_args
         if model is None:
             model = Pipeline([
-                ('design matrix', PolynomialFeatures(1)),
+                ('design matrix', PolynomialFeatures(2)),
                 ('model', LinearRegression())
             ])
 
@@ -133,7 +133,10 @@ class BasicGaze(GazeModel):
         normed = []
         for i, (c, g) in enumerate(zip(centers, glints)):
             # print(i)
-            normed.append([c[0] - g[0, 0], c[1] - g[0, 1]])
+            if len(g) == 0:
+                normed.append([-1, -1])
+            else:
+                normed.append([c[0] - g[0, 0], c[1] - g[0, 1]])
 
         # print(normed)
 
@@ -175,7 +178,7 @@ class BasicGaze(GazeModel):
 
     def calibrate(self, images, gaze_positions):
         pupil = self._preprocess(images)
-        norm_pos = features.normalize_coordinates(gaze_positions, 2160, 3840)
+        norm_pos = features.normalize_coordinates(gaze_positions, 2160, 3840)  # TODO: hardcoded?!
         self.model.fit(pupil, norm_pos)
 
     def predict(self, images):

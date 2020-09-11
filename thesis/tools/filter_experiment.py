@@ -1,11 +1,14 @@
-from typing import List
-
 import click
 import yaml
 
-from thesis.data import GazeDataset, SegmentationDataset
+import matplotlib.pyplot as plt
+import matplotlib
+from util.utilities import load_gaze_data, load_iris_data
+
+matplotlib.use('TkAgg')
+
 from thesis.optim.multi_objective import ObfuscationObjective, NaiveMultiObjectiveOptimizer
-from thesis.optim.sampling import uniform_sampler, samples_step, samples_num
+from thesis.optim.sampling import GridSearch, samples_num
 from thesis.optim.filters import bfilter
 
 
@@ -27,26 +30,36 @@ def run(config):
 
         optimizer = setup_optimizer(iris_data, gaze_data)
         optimizer.run(status=True)
+        metrics = optimizer.metrics()
+        # pprint.pprint(metrics)
+        pareto = optimizer.pareto_frontier()
+        # print(pareto)
 
-
-def load_gaze_data(datasets: List[str]) -> List[GazeDataset]:
-    return list(map(GazeDataset.from_path, datasets))
-
-
-def load_iris_data(datasets: List[str]) -> List[SegmentationDataset]:
-    return list(map(SegmentationDataset.from_path, datasets))
+        x = [e[1]['gaze'] for e in metrics]
+        y = [e[1]['gradient_entropy'] for e in metrics]
+        plt.scatter(x, y)
+        x = [e[1]['gaze'] for e in pareto]
+        y = [e[1]['gradient_entropy'] for e in pareto]
+        plt.plot(x, y)
+        plt.show()
 
 
 def setup_optimizer(iris_data, gaze_data):
     objective = ObfuscationObjective(bfilter, iris_data, gaze_data)
-    sampler = uniform_sampler(
-        ['ksize', 'sigma_c', 'sigma_s'],
+    sampler = GridSearch(
+        ['sigma_c', 'sigma_s'],
         [
-            samples_step(3, 11, 2, stratified=False),
-            samples_num(5, 15, 10),
-            samples_num(5, 15, 10),
+            samples_num(1, 100, 5),
+            samples_num(5, 15, 5),
         ]
     )
+    # objective = ObfuscationObjective(gfilter, iris_data, gaze_data)
+    # sampler = UniformSampler(
+    #     ['sigma'],
+    #     [
+    #         samples_num(1, 50, 5),
+    #     ]
+    # )
     return NaiveMultiObjectiveOptimizer(objective, sampler)
 
 

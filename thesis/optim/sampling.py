@@ -1,3 +1,7 @@
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from functools import reduce
+
 from itertools import product
 from typing import *
 from typing_extensions import Protocol
@@ -24,7 +28,7 @@ def samples_step(start, stop, step=1, *, stratified=True, clip=True):
     """
     nums = np.arange(start, stop, step)
     if stratified:
-        nums = nums + (np.random.random(len(nums))*step - step*0.5)
+        nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
     return nums
 
 
@@ -42,48 +46,60 @@ def samples_num(start, stop, num, *, stratified=True, clip=True):
 
     """
     nums = np.linspace(start, stop, num)
-    step = 1 if num == 0 else (stop-start)/num
+    step = 1 if num == 0 else (stop - start) / num
     if stratified:
         nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
-    return nums
+    return nums.clip(start, stop)
 
 
-class Strategy(Protocol):
-    def __call__(
-            self, params: List[str],
-            generators: List[Any]) -> Generator[Dict[str, T], None, None]:
-        """
-
-        Args:
-            params: Parameter names
-            generators: Generator list
-
-        Yields:
-            dict: Dictionary of parameter/value pairs.
-        """
+@dataclass
+class Sampler(ABC):
+    @abstractmethod
+    def __len__(self):
         ...
 
+    @abstractmethod
+    def __iter__(self):
+        ...
 
-def grid_search(params: List[str], generators: List[np.ndarray]):
+    params: List[str]
+    generators: List[np.ndarray]
+
+
+class GridSearch(Sampler):
     """Perform a search over the cartesian product of the generator values. The number of search values
     rise exponentially with the number of generators.
     """
-    for values in product(*generators):
-        yield dict(zip(params, values))
+
+    def __len__(self):
+        return int(reduce(lambda a, b: a*b, map(len, self.generators)))
+
+    def __iter__(self):
+        for values in product(*self.generators):
+            yield dict(zip(self.params, values))
 
 
-def uniform_sampler(params: List[str], generators: List[np.ndarray]):
+class UniformSampler(Sampler):
     """Generate a uniform sampling for searching. The number of search values is equal to the length of
     the longest generator.
     """
-    for gen in generators:
-        np.random.shuffle(gen)
-    max_len = len(max(generators, key=len))
-    generators = [cycle(gen) if len(gen) < max_len else gen for gen in generators]
-    for values in zip(*generators):
-        yield dict(zip(params, values))
 
+    def __len__(self):
+        return max(map(len, self.generators))
 
-def random_generator(params, generators):
-    while True:
-        yield {param: gen() for param, gen in zip(params, generators)}
+    def __iter__(self):
+        for gen in self.generators:
+            np.random.shuffle(gen)
+        max_len = len(max(self.generators, key=len))
+        generators = [cycle(gen) if len(gen) < max_len else gen for gen in self.generators]
+        for values in zip(*generators):
+            yield dict(zip(self.params, values))
+
+# class RandomSampler(Strategy):
+#
+#     def __len__(self):
+#         pass
+#
+#     def __iter__(self):
+#         while True:
+#             yield {param: gen for param, gen in zip(self.params, self.generators)}
