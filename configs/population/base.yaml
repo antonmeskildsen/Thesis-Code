@@ -1,0 +1,27 @@
+bfilter:
+  sigma_s:
+    type: samples_uniform
+    params:
+      a: 0
+      b: 30
+    mutation:
+      sigma: 1
+      mean: 0.0
+  sigma_c:
+    type: samples_uniform
+    params:
+      a: 0.1
+      b: 100
+    mutation:
+      sigma: 1
+      mean: 0.0
+
+gfilter:
+  sigma:
+    type: samples_uniform
+    params:
+      a: 0.01
+      b: 1.0
+    mutation:
+      sigma: 0.05
+      mean: 0.0

@@ -29,51 +29,52 @@ def intensity_entropy(image, mask):
 T = TypeVar('T')
 
 
-class Term(ABC, Generic[T]):
+class SegmentationTerm(ABC):
+    def __init__(self):
+        ...
+
     @abstractmethod
     def __call__(self, sample: T, filtered: np.ndarray) -> float:
         ...
 
 
-@dataclass
-class AbsoluteEntropy(Term[SegmentationSample]):
-    histogram_func: Callable
+class GazeTerm(ABC):
+    def __init__(self):
+        ...
 
+    @abstractmethod
+    def __call__(self, model: GazeModel, sample: T, filtered: np.ndarray) -> float:
+        ...
+
+
+class AbsoluteGradientEntropy(SegmentationTerm):
     def __call__(self, sample: SegmentationSample, filtered: np.ndarray) -> float:
-        hist = self.histogram_func(filtered, sample.image.mask)
+        hist = gradient_histogram(filtered, sample.image.mask)
         return entropy(hist)
 
 
-@dataclass
-class RelativeEntropy(Term[SegmentationSample]):
-    histogram_func: Callable
-
+class RelativeGradientEntropy(SegmentationTerm):
     def __call__(self, sample: SegmentationSample, filtered: np.ndarray) -> float:
-        hist_a = self.histogram_func(sample.image.image, sample.image.mask)
-        hist_b = self.histogram_func(filtered, sample.image.mask)
+        hist_a = gradient_histogram(sample.image.image, sample.image.mask)
+        hist_b = gradient_histogram(filtered, sample.image.mask)
         entropy_a = entropy(hist_a)
         entropy_b = entropy(hist_b)
         return entropy_b / entropy_a
 
 
-@dataclass
-class GazeAbsoluteAccuracy(Term[GazeImage]):
-    model: GazeModel
-
-    def __call__(self, sample: GazeImage, filtered: np.ndarray) -> float:
-        gaze = self.model.predict(filtered)
+class GazeAbsoluteAccuracy(GazeTerm):
+    def __call__(self, model: GazeModel, sample: GazeImage, filtered: np.ndarray) -> float:
+        gaze = model.predict(filtered)
         true = normalize_coordinates(np.array([sample.screen_position]), 2160, 3840)
         return np.linalg.norm(np.array(gaze) - np.array(true))
 
 
-@dataclass
-class GazeRelativeAccuracy(Term[GazeImage]):
-    model: GazeModel
-
-    def __call__(self, sample: GazeImage, filtered: np.ndarray) -> float:
-        gaze_a = self.model.predict(sample.image)
-        gaze_b = self.model.predict(filtered)
-        dist_a = np.linalg.norm(np.array(gaze_a) - np.array(sample.screen_position))
-        dist_b = np.linalg.norm(np.array(gaze_b) - np.array(sample.screen_position))
+class GazeRelativeAccuracy(GazeTerm):
+    def __call__(self, model: GazeModel, sample: GazeImage, filtered: np.ndarray) -> float:
+        gaze_a = model.predict(sample.image)
+        gaze_b = model.predict(filtered)
+        screen = normalize_coordinates(np.array([sample.screen_position]), 2160, 3840)
+        dist_a = np.linalg.norm(np.array(gaze_a) - np.array(screen))
+        dist_b = np.linalg.norm(np.array(gaze_b) - np.array(screen))
 
         return dist_b / dist_a

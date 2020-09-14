@@ -1,18 +1,24 @@
 bfilter:
   sigma_s:
-    type: samples_num
-    start: 1
-    stop: 5
-    num: 10
+    type: samples_exp
+    params:
+      start: 1
+      stop: 10
+      num: 5
+      exp: 10
   sigma_c:
-    type: samples_num
-    start: 20
-    stop: 100
-    num: 5
+    type: samples_exp
+    params:
+      start: 5
+      stop: 100
+      num: 5
+      exp: 10
 
 gfilter:
   sigma:
-    type: samples_num
-    start: 1
-    stop: 5
-    num: 5
+    type: samples_exp
+    params:
+      start: 0
+      stop: 10
+      num: 10
+      exp: 15

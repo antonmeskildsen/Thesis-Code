@@ -52,6 +52,36 @@ def samples_num(start, stop, num, *, stratified=True, clip=True):
     return nums.clip(start, stop)
 
 
+def samples_exp(start, stop, num, exp, *, stratified=True, clip=True):
+    """Create exponentially spaced samples.
+
+        Args:
+            start:
+            stop:
+            num:
+            exp:
+            stratified:
+            clip:
+
+        Returns:
+
+        """
+    nums = (np.logspace(0, 1, num, base=exp) - 1)/(exp-1)  # Create and adjust to the interval ]0, 1[
+    nums = nums * (stop-start) + start  # Scale
+    step = 1 if num == 0 else (stop - start) / num
+    if stratified:
+        nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
+    return nums.clip(start, stop)
+
+
+def samples_uniform(a, b, num, *, stratified=True, clip=True):
+    return np.random.uniform(a, b, num)
+
+
+def samples_normal(sigma, mean, num, *, stratified=True, clip=True):
+    return np.random.normal(mean, sigma, num)
+
+
 @dataclass
 class Sampler(ABC):
     @abstractmethod
@@ -64,6 +94,16 @@ class Sampler(ABC):
 
     params: List[str]
     generators: List[np.ndarray]
+
+
+class PopulationInitializer(Sampler):
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield dict(zip(self.params, [gen[i] for gen in self.generators]))
+
+    def __len__(self):
+        return len(self.generators[0])
 
 
 class GridSearch(Sampler):
