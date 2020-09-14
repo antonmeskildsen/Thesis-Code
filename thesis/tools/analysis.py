@@ -19,7 +19,7 @@ from thesis.util.st_utils import file_select, type_name, json_to_strategy, progr
 from thesis.util.utilities import load_iris_data, load_gaze_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler
 from thesis.optim.filters import bfilter, gfilter
-from thesis.optim.objective_terms import Term, AbsoluteEntropy, RelativeEntropy, GazeAbsoluteAccuracy, \
+from thesis.optim.objective_terms import Term, AbsoluteGradientEntropy, RelativeGradientEntropy, GazeAbsoluteAccuracy, \
     GazeRelativeAccuracy
 
 st.title("Obfuscation result analysis")
@@ -31,24 +31,37 @@ file_path = file_select('Result file', os.path.join('results', '*.json'))
 with open(file_path) as file:
     results = json.load(file)
 
-st.write(results)
 
 frame = pd.DataFrame(results['results'])
+st.write(frame)
 # for filter_name, r in metrics.items():
 #     frame = pd.DataFrame(r)
 #     st.write(frame)
 
 dom = st.slider('x-axis domain', 0.05, 1., 0.5)
 
+x = st.selectbox('X-axis', frame.columns, index=0)
+y = st.selectbox('Y-axis', frame.columns, index=1)
+
+# alt.X(x, scale=alt.Scale(domain=(0, dom)))
 c = alt.Chart(frame).mark_point().encode(
-    alt.X('gaze', scale=alt.Scale(domain=(0, dom))),
-    y='gradient_entropy',
+    x=x,
+    y=y,
     color='filter'
 ).interactive()
 
 c = c + alt.Chart(frame).mark_line().encode(
-    x='gaze',
-    y='gradient_entropy',
+    x=x,
+    y=y,
     color='filter'
 ).transform_filter(alt.datum.pareto).interactive()
 st.altair_chart(c, use_container_width=True)
+
+
+
+# c = alt.Chart(frame).mark_point().encode(
+#     x=x,
+#     y=y,
+#     color='filter'
+# ).interactive()
+# st.altair_chart(c, use_container_width=True)

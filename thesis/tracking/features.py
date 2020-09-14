@@ -18,7 +18,7 @@ def pupil_detector(input, debug=False):
     if len(contours) == 0:
         return [-1, -1, -1, -1, -1]
 
-    contours = list(filter(lambda x: ratio(x) > 0.5, contours))
+    contours = list(filter(lambda x: ratio(x) > 0.5 and len(x) > 5, contours))
 
     if len(contours) == 0:
         return [-1, -1, -1, -1, -1]

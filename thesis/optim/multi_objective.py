@@ -1,42 +1,27 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, List, Callable, Iterator
+from typing import Any, List, Callable, Iterator, Dict
 from tqdm import tqdm
 
 import numpy as np
 
 from thesis.data import SegmentationDataset, GazeDataset, SegmentationSample, GazeImage
 from thesis.information.entropy import gradient_histogram, histogram
-from thesis.optim.sampling import Sampler
-from thesis.optim.objective_terms import gradient_entropy, GazeAbsoluteAccuracy, AbsoluteEntropy
-
-
-class MultiObjectiveOptimizer:
-    @abstractmethod
-    def run(self, *, wrapper=None):
-        ...
-
-    @abstractmethod
-    def metrics(self):
-        ...
-
-    @abstractmethod
-    def pareto_frontier(self):
-        ...
-
-
-@dataclass
-class Term:
-    model: None
-
-    def __call__(self, data_point, filtered_image):
-        ...
+from thesis.optim.sampling import Sampler, PopulationInitializer
+from thesis.optim.objective_terms import gradient_entropy, GazeAbsoluteAccuracy, AbsoluteGradientEntropy, \
+    GazeRelativeAccuracy, \
+    GazeTerm, SegmentationTerm
+from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
 
 
 class Objective(ABC):
 
     @abstractmethod
-    def eval(self, params):
+    def metrics(self) -> List[str]:
+        ...
+
+    @abstractmethod
+    def eval(self, params) -> List[float]:
         ...
 
     @abstractmethod
@@ -50,34 +35,54 @@ class ObfuscationObjective(Objective):
     iris_datasets: List[SegmentationDataset]
     gaze_datasets: List[GazeDataset]
 
-    def eval(self, params):
-        gradient_entropies = []
-        intensity_entropies = []
-        gaze = []
+    iris_terms: List[SegmentationTerm]
+    gaze_terms: List[GazeTerm]
 
-        grad_func = AbsoluteEntropy(gradient_histogram)
-        intensity_func = AbsoluteEntropy(histogram)
+    def metrics(self) -> List[str]:
+        return list(map(lambda x: type(x).__name__, self.iris_terms)) + list(
+            map(lambda x: type(x).__name__, self.gaze_terms))
+
+    def eval(self, params):
+        iris_results = [[]] * len(self.iris_terms)
+        gaze_results = [[]] * len(self.gaze_terms)
 
         for dataset in self.iris_datasets:
             for sample in dataset.samples:
                 output = self.filter(sample.image.image, **params)
-                gradient_entropies.append(grad_func(sample, output))
-                intensity_entropies.append(intensity_func(sample, output))
+                for i, term in enumerate(self.iris_terms):
+                    iris_results[i].append(term(sample, output))
 
         for dataset in self.gaze_datasets:
-            model = GazeAbsoluteAccuracy(dataset.model)
             for sample in dataset.test_samples:
                 output = self.filter(sample.image, **params)
-                gaze.append(model(sample, output))
+                for i, term in enumerate(self.gaze_terms):
+                    gaze_results[i].append(term(dataset.model, sample, output))
 
-        return {
-            'gradient_entropy': np.mean(gradient_entropies),
-            'gaze': np.mean(gaze)
-            # 'intensity_entropy': np.mean(intensity_entropies)
-        }
+        return list(map(np.mean, iris_results)) + list(map(np.mean, gaze_results))
 
     def output_dimensions(self):
-        return 2
+        return len(self.iris_terms) + len(self.gaze_terms)
+
+
+@dataclass
+class MultiObjectiveOptimizer:
+    results: List
+    objective: Objective
+
+    @abstractmethod
+    def run(self, *, wrapper=None):
+        ...
+
+    def metrics(self):
+        return self.results
+
+    def pareto_frontier(self, k=0):
+        pareto = []
+        for i, (params, output, _) in enumerate(self.results):
+            if not any([dominates(tuple(output_mark.values()), tuple(output.values())) for _, output_mark, km in
+                        self.results if km == k]):
+                pareto.append(i)
+        return pareto
 
 
 def dominates(y, y_mark):
@@ -87,19 +92,54 @@ def dominates(y, y_mark):
 
 
 @dataclass
-class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer, ABC):
-    ...
+class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer):
+    selection_method: SelectionMethod
+    crossover_method: CrossoverMethod
+    mutation_method: MutationMethod
+    iterations: int
+    initial_population: PopulationInitializer
+
+    def run(self, *, wrapper=None):
+        pop = list(self.initial_population)
+        params = list(pop[0].keys())
+
+        m = self.objective.output_dimensions()
+        m_pop = len(pop)
+        m_subpop = m_pop // m + 1  # TODO: Check for correct solution (is it important to get len(parents)==m_pop?
+
+        iterator = range(self.iterations)
+        if wrapper is not None:
+            iterator = wrapper(range(self.iterations), self.iterations)
+
+        self.results = []
+        for k in iterator:
+            ys = [self.objective.eval(x) for x in pop]
+            self.results.extend(list(zip(pop, [dict(zip(self.objective.metrics(), y)) for y in ys], [k] * len(pop))))
+
+            parents = []
+            for i in range(m):
+                selected = self.selection_method.select([y[i] for y in ys])
+                parents.extend(selected[:m_subpop])
+
+            p = np.random.choice(m_pop * 2, m_pop * 2, False)
+
+            def p_ind(i):
+                return parents[p[i] % m_pop][p[i] // m_pop]
+
+            parents = [(p_ind(i), p_ind(i + 1)) for i in range(0, 2 * m_pop, 2)]
+            pop_values = [list(p.values()) for p in pop]
+            children = [self.crossover_method.crossover(pop_values[p[0]], pop_values[p[1]]) for p in parents]
+            pop_values = [self.mutation_method.mutate(c) for c in children]
+            pop_values = [np.clip(v, 0, None) for v in pop_values]
+            pop = [dict(zip(params, p)) for p in pop_values]
 
 
 @dataclass
 class NaiveMultiObjectiveOptimizer(MultiObjectiveOptimizer):
-    def __init__(self, objective: Objective, sampler: Sampler):
-        self.objective = objective
-        self.sampler = sampler
-
-        self.results = []
+    sampler: Sampler
 
     def run(self, *, wrapper=None):
+        self.results = []
         if wrapper is not None:
             iterator = wrapper(self.sampler, len(self.sampler))
         else:
@@ -107,24 +147,4 @@ class NaiveMultiObjectiveOptimizer(MultiObjectiveOptimizer):
 
         for params in iterator:
             output = self.objective.eval(params)
-            self.results.append((params, output))
-
-    def metrics(self):
-        return self.results
-
-    def pareto_frontier(self):
-        pareto = []
-        for i, (params, output) in enumerate(self.results):
-            if not any([dominates(tuple(output_mark.values()), tuple(output.values())) for _, output_mark in
-                        self.results]):
-                # pareto.append((params, output))
-                pareto.append(i)
-
-        # d = len(self.results)
-        # domination_matrix = np.zeros((d, d))
-        # for i, (params, output) in enumerate(self.results):
-        #     for j, (params_mark, output_mark) in enumerate(self.results):
-        #         if dominates(tuple(output.values()), tuple(output_mark.values())):
-        #             domination_matrix[i, j] = 1
-        # print(domination_matrix)
-        return pareto
+            self.results.append((params, dict(zip(self.objective.metrics(), output)), 0))
