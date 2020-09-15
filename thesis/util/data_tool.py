@@ -87,7 +87,7 @@ def get_segmented_images(dataset: str, path: str):
     res = []
 
     formatter = None
-    if dataset == 'casia4i':
+    if 'casia4i' in dataset:
         formatter = CasiaIVFormat()
     elif dataset == 'ubiris':
         formatter = UbirisFormat()
@@ -170,7 +170,7 @@ def preview(path):
             masked = cv.bitwise_and(img, img, mask=iris_img.mask * 255)
             cv.imshow('Preview', masked)
 
-            polar, mask = iris_img.polar_image(200, 100)
+            polar, mask = iris_img.to_polar(200, 100)
             cv.imshow('Polar', polar)
             masked = cv.bitwise_and(polar, polar, mask=mask * 255)
             cv.imshow('PolarMask', masked)

@@ -19,8 +19,8 @@ from thesis.util.st_utils import file_select, type_name, json_to_strategy, progr
 from thesis.util.utilities import load_iris_data, load_gaze_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler
 from thesis.optim.filters import bfilter, gfilter
-from thesis.optim.objective_terms import Term, AbsoluteGradientEntropy, RelativeGradientEntropy, GazeAbsoluteAccuracy, \
-    GazeRelativeAccuracy
+from thesis.optim.objective_terms import AbsoluteGradientEntropy, RelativeGradientEntropy, AbsoluteGazeAccuracy, \
+    RelativeGazeAccuracy
 
 st.title("Obfuscation result analysis")
 """
@@ -38,19 +38,24 @@ st.write(frame)
 #     frame = pd.DataFrame(r)
 #     st.write(frame)
 
-dom = st.slider('x-axis domain', 0.05, 1., 0.5)
 
-x = st.selectbox('X-axis', frame.columns, index=0)
-y = st.selectbox('Y-axis', frame.columns, index=1)
+st.sidebar.write("# Display settings")
+x = st.sidebar.selectbox('X-axis', frame.columns, index=0)
+y = st.sidebar.selectbox('Y-axis', frame.columns, index=1)
+
+if results['optimizer']['method'] == 'PopulationMultiObjectiveOptimizer':
+    k = st.sidebar.number_input('Choose iteration', 0, max(frame['k']), 0)
+else:
+    k = 0
 
 # alt.X(x, scale=alt.Scale(domain=(0, dom)))
-c = alt.Chart(frame).mark_point().encode(
+c = alt.Chart(frame[frame['k'] == k]).mark_point().encode(
     x=x,
     y=y,
     color='filter'
 ).interactive()
 
-c = c + alt.Chart(frame).mark_line().encode(
+c = c + alt.Chart(frame[frame['k'] == k]).mark_line().encode(
     x=x,
     y=y,
     color='filter'

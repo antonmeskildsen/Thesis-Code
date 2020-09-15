@@ -20,9 +20,9 @@ from thesis.util.st_utils import file_select, type_name, json_to_strategy, progr
 from thesis.util.utilities import load_iris_data, load_gaze_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, PopulationInitializer
 from thesis.optim import sampling
-from thesis.optim.filters import bfilter, gfilter
-from thesis.optim.objective_terms import AbsoluteGradientEntropy, RelativeGradientEntropy, GazeAbsoluteAccuracy, \
-    GazeRelativeAccuracy
+from thesis.optim.filters import bfilter, gfilter, uniform_noise, gaussian_noise
+from thesis.optim.objective_terms import AbsoluteGradientEntropy, RelativeGradientEntropy, AbsoluteGazeAccuracy, \
+    RelativeGazeAccuracy, IrisCodeSimilarity
 from thesis.optim.population import TruncationSelection, TournamentSelection, UniformCrossover, GaussianMutation
 
 st.title('Obfuscation Experiment')
@@ -61,15 +61,17 @@ st.sidebar.write("""
 ## Metrics and results
 """)
 
-iris_metrics = st.sidebar.multiselect('Iris metrics', (AbsoluteGradientEntropy, RelativeGradientEntropy),
+iris_metrics = st.sidebar.multiselect('Iris metrics',
+                                      (AbsoluteGradientEntropy, RelativeGradientEntropy, IrisCodeSimilarity),
                                       default=(AbsoluteGradientEntropy,), format_func=type_name)
-gaze_metrics = st.sidebar.multiselect('Gaze metrics', (GazeAbsoluteAccuracy, GazeRelativeAccuracy),
-                                      default=(GazeAbsoluteAccuracy,), format_func=type_name)
+gaze_metrics = st.sidebar.multiselect('Gaze metrics', (AbsoluteGazeAccuracy, RelativeGazeAccuracy),
+                                      default=(AbsoluteGazeAccuracy,), format_func=type_name)
 
 iris_terms = list(map(lambda x: x(), iris_metrics))
 gaze_terms = list(map(lambda x: x(), gaze_metrics))
 
-filters = st.sidebar.multiselect('Filter types', (gfilter, bfilter), default=(gfilter,), format_func=type_name)
+filters = st.sidebar.multiselect('Filter types', (gfilter, bfilter, gaussian_noise, uniform_noise), default=(gfilter,),
+                                 format_func=type_name)
 
 st.sidebar.write(
     """
@@ -119,6 +121,8 @@ elif method == PopulationMultiObjectiveOptimizer:
     # mutation = st.sidebar.selectbox('Mutation technique', (GaussianMutation,), format_func=type_name)
 
     pop_num = st.number_input('Population', 1, 1000, 10)
+
+    projected_iterations = iterations * pop_num * len(filters)
 
     for f in filters:
         objective = ObfuscationObjective(f, iris_data, gaze_data, iris_terms, gaze_terms)

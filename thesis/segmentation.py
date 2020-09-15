@@ -62,12 +62,13 @@ class IrisImage:
         image = cv.imread(data['image'])
         return IrisImage(segmentation, image)
 
-    def polar_image(self, angular_resolution, linear_resolution) -> np.ndarray:
+    def to_polar(self, angular_resolution, linear_resolution, start_angle=0) -> np.ndarray:
         """Create polar image.
 
         Args:
             angular_resolution: Number of angular stops.
             linear_resolution: Number of stops from pupil to iris.
+            start_angle:
 
         Returns:
 
@@ -75,7 +76,7 @@ class IrisImage:
         output = np.zeros((linear_resolution, angular_resolution), np.uint8)
         output_mask = np.zeros((linear_resolution, angular_resolution), np.uint8)
 
-        angle_steps = np.linspace(0, 2 * np.pi, angular_resolution)
+        angle_steps = np.linspace(start_angle, start_angle + 2 * np.pi, angular_resolution)
         for i, theta in enumerate(angle_steps):
             start, stop = self.segmentation.intersect_angle(theta)
             x_coord, y_coord = start.linear_interpolation(stop, linear_resolution)
@@ -91,11 +92,13 @@ class IrisImage:
 @dataclass
 class IrisCode:
     code: np.ndarray
+    mask: np.ndarray
+
     # def __init__(self, iris_image: IrisImage,
     #              scales: int = 3,
     #              angles: int = 3,
     #              frequency_scale_base=2):
-    #     polar, polar_mask = iris_image.polar_image(20, 5)
+    #     polar, polar_mask = iris_image.to_polar(20, 5)
     #     polar = np.float64(polar)
     #     res = []
     #     for s in range(1, scales + 1):
@@ -112,39 +115,63 @@ class IrisCode:
     #     self.code = np.array(res)
 
     def dist(self, other):
-        n = ((self.code * other.code) == 0).sum()
-        self.code[other.code == 0] = 0
-        other.code[self.code == 0] = 0
-        return (self.code != other.code).sum() / (len(self) - n)
+        mask = self.mask | other.mask
+        n = mask.sum()
+        return (self.code != other.code)[mask == 0].sum() / (len(self) - n)
 
     def __len__(self):
         return self.code.size
+
+    def shift(self, n_bits):
+        return IrisCode(np.concatenate((self.code[n_bits:], self.code[:n_bits])),
+                        np.concatenate((self.mask[n_bits:], self.mask[:n_bits])))
+
+    def masked_image(self):
+        c = np.array(self.code)
+        c[self.mask == 1] = 0
+        c = c / 2 + 0.5
+        return c
 
 
 class IrisCodeEncoder:
     def __init__(self, scales: int = 3,
                  angles: int = 3,
-                 frequency_scale_base=2):
+                 angular_resolution=20,
+                 radial_resolution=10,
+                 wavelength_base=0.5,
+                 mult=1.41,
+                 eps=0.01):
         self.kernels = []
-        for s in range(1, scales + 1):
-            frequency_scale = frequency_scale_base / 2 ** s
-            for t in np.linspace(0, np.pi - (np.pi / angles), angles):
-                kernel = cv.getGaborKernel((3, 3), sigma=1, theta=t, lambd=frequency_scale, gamma=1, psi=0, ktype=cv.CV_64F)
-                self.kernels.append(kernel)
-                kernel = cv.getGaborKernel((3, 3), sigma=1, theta=t+np.pi/2, lambd=frequency_scale, gamma=1, psi=0,
+        self.angular_resolution = angular_resolution
+        self.radial_resolution = radial_resolution
+        self.eps = eps
+        wavelength = wavelength_base
+        for s in range(scales):
+            sigma = wavelength / 0.5
+            k = max(3, int(sigma // 2 * 2 + 1))
+            # print(sigma, k)
+            for t in np.pi / np.arange(1, angles + 1):
+                kernel = cv.getGaborKernel((k, k), sigma, theta=t, lambd=wavelength, gamma=1, psi=np.pi * 0.5,
                                            ktype=cv.CV_64F)
                 self.kernels.append(kernel)
+                # kernel = cv.getGaborKernel((5, 5), sigma=frequency_scale, theta=t + np.pi / 2, lambd=frequency_scale, gamma=1,
+                #                            psi=np.pi * 0.5, ktype=cv.CV_64F)
+                # self.kernels.append(kernel)
+            wavelength *= mult
 
-    def encode(self, image):
-        polar, polar_mask = image.polar_image(20, 5)
+    def encode(self, image, start_angle=0):
+        polar, polar_mask = image.to_polar(self.angular_resolution, self.radial_resolution, start_angle)
+        polar = cv.equalizeHist(polar)
         polar = np.float64(polar)
         res = []
+        mask = []
         for k in self.kernels:
             f = cv.filter2D(polar, cv.CV_64F, k)
+            m = np.zeros(f.shape, np.uint8)
+            m[np.abs(f) < self.eps] = 1
             f = np.sign(f)
-            f[polar_mask == 0] = 0
+            m[polar_mask == 0] = 1
             res.extend(f.reshape(-1))
+            mask.extend(m.reshape(-1))
 
-        return IrisCode(np.array(res))
-
-
+        return IrisCode(np.array(res), np.array(mask))

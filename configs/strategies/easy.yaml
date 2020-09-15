@@ -1,3 +1,25 @@
+uniform_noise:
+  intensity:
+    type: samples_num
+    params:
+      start: 0
+      stop: 100
+      num: 30
+
+
+gaussian_noise:
+  loc:
+    type: const
+    params:
+      val: 0.0
+  scale:
+    type: samples_num
+    params:
+      start: 0
+      stop: 100
+      num: 20
+
+
 bfilter:
   sigma_s:
     type: samples_exp

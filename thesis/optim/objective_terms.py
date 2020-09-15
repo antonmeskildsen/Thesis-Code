@@ -10,6 +10,7 @@ from thesis.data import SegmentationSample, GazeImage
 from thesis.information.entropy import gradient_histogram, histogram, entropy
 from thesis.tracking.gaze import GazeModel
 from thesis.tracking.features import normalize_coordinates
+from thesis.segmentation import IrisCodeEncoder, IrisCode, IrisImage
 
 
 def bilateral_filter(img, kernel_size, sigma_c, sigma_s):
@@ -34,7 +35,7 @@ class SegmentationTerm(ABC):
         ...
 
     @abstractmethod
-    def __call__(self, sample: T, filtered: np.ndarray) -> float:
+    def __call__(self, sample: SegmentationSample, filtered: np.ndarray) -> float:
         ...
 
 
@@ -62,14 +63,33 @@ class RelativeGradientEntropy(SegmentationTerm):
         return entropy_b / entropy_a
 
 
-class GazeAbsoluteAccuracy(GazeTerm):
+class IrisCodeSimilarity(SegmentationTerm):
+    """Defined as (1-HD)"""
+
+    def __init__(self):
+        super().__init__()
+        self.encoder = IrisCodeEncoder(scales=3,
+                                       angles=5,
+                                       angular_resolution=20,
+                                       radial_resolution=18,
+                                       wavelength_base=0.5,
+                                       mult=1.41)
+
+    def __call__(self, sample: SegmentationSample, filtered: np.ndarray) -> float:
+        code_sample = self.encoder.encode(sample.image)
+        filtered_iris_image = IrisImage(sample.image.segmentation, filtered)
+        code_filtered = self.encoder.encode(filtered_iris_image)
+        return 1-code_sample.dist(code_filtered)
+
+
+class AbsoluteGazeAccuracy(GazeTerm):
     def __call__(self, model: GazeModel, sample: GazeImage, filtered: np.ndarray) -> float:
         gaze = model.predict(filtered)
         true = normalize_coordinates(np.array([sample.screen_position]), 2160, 3840)
         return np.linalg.norm(np.array(gaze) - np.array(true))
 
 
-class GazeRelativeAccuracy(GazeTerm):
+class RelativeGazeAccuracy(GazeTerm):
     def __call__(self, model: GazeModel, sample: GazeImage, filtered: np.ndarray) -> float:
         gaze_a = model.predict(sample.image)
         gaze_b = model.predict(filtered)
