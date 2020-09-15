@@ -16,12 +16,18 @@ def pupil_detector(input, debug=False):
                                   cv.CHAIN_APPROX_SIMPLE)
 
     if len(contours) == 0:
-        return [-1, -1, -1, -1, -1]
+        if debug:
+            return [-1, -1, -1, -1, -1], thresh
+        else:
+            return [-1, -1, -1, -1, -1]
 
     contours = list(filter(lambda x: ratio(x) > 0.5 and len(x) > 5, contours))
 
     if len(contours) == 0:
-        return [-1, -1, -1, -1, -1]
+        if debug:
+            return [-1, -1, -1, -1, -1], thresh
+        else:
+            return [-1, -1, -1, -1, -1]
 
     best = sorted(contours,
                   key=lambda c: cv.contourArea(c),

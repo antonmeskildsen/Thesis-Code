@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 from thesis.tracking.features import *
 from thesis.tracking.gaze import BasicGaze
 from thesis.util.utilities import load_json, load_images
+from thesis.optim.filters import uniform_noise
 
 import streamlit as st
 
@@ -51,6 +52,13 @@ if st.sidebar.checkbox('Bilateral filter'):
     images = [cv.bilateralFilter(img, d, s_color, s_space) for img in images]
     idx = st.number_input('Image', 0, len(images), 0)
     st.image(images[int(idx)], 'Sample')
+
+
+st.sidebar.write("# Filter")
+filter_choice = st.sidebar.selectbox('Obfuscation filter', ('uniform noise',))
+if filter_choice == 'uniform noise':
+    intensity = st.sidebar.slider('Noise intensity', 0, 128, 10)
+    images = [uniform_noise(img, intensity) for img in images]
 
 
 def show(img, **kwargs):

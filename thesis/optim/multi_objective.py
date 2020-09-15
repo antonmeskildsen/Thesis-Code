@@ -8,8 +8,8 @@ import numpy as np
 from thesis.data import SegmentationDataset, GazeDataset, SegmentationSample, GazeImage
 from thesis.information.entropy import gradient_histogram, histogram
 from thesis.optim.sampling import Sampler, PopulationInitializer
-from thesis.optim.objective_terms import gradient_entropy, GazeAbsoluteAccuracy, AbsoluteGradientEntropy, \
-    GazeRelativeAccuracy, \
+from thesis.optim.objective_terms import gradient_entropy, AbsoluteGazeAccuracy, AbsoluteGradientEntropy, \
+    RelativeGazeAccuracy, \
     GazeTerm, SegmentationTerm
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
 

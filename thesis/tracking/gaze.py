@@ -115,6 +115,7 @@ class BasicGaze(GazeModel):
         self.model = model
 
     def _preprocess(self, images):
+        # images = np.array([cv.GaussianBlur(img, (0, 0), 0.5) for img in images])
         images = np.array(images)
         if len(images.shape) == 2:
             images = [images]

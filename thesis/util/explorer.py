@@ -6,8 +6,12 @@ import json
 import numpy as np
 import cv2 as cv
 from glob2 import glob
+from itertools import product
 
-from eyeinfo import IrisImage, IrisEncoder, IrisSegmentationDescriptor
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from thesis.segmentation import IrisImage, IrisSegmentation, IrisCodeEncoder, IrisCode
 
 "# Explorer"
 
@@ -19,37 +23,51 @@ names = [os.path.basename(p).split('.')[0] for p in files]
 
 dataset = st.selectbox('Dataset', names)
 
-encoder = IrisEncoder(3, 5, 2)
+scales = st.sidebar.slider('Scales', 1, 10, 6)
+angles = st.sidebar.slider('Angles', 1, 20, 6)
+wavelength = st.sidebar.slider('Wavelength Base', 0.0, 10.0, 0.5)
+mult = st.sidebar.slider('Wavelength multiplier', 1.0, 5.0, 1.41)
+angular = st.sidebar.slider('Angular Resolution', 5, 100, 30, 2)
+radial = st.sidebar.slider('Radial Resolution', 2, 50, 18, 2)
+
+encoder = IrisCodeEncoder(scales, angles, angular, radial, wavelength, mult)
 
 
 def get_code(img, info):
-    inner = info['inner']
-    outer = info['outer']
-    lower = info['lower']
-    upper = info['upper']
-    seg = IrisSegmentationDescriptor.from_points(inner, outer, lower, upper)
+    seg = IrisSegmentation.from_dict(info)
     # m = seg.get_mask((250, 250))
     iris_img = IrisImage(seg, img)
-    polar, _ = iris_img.to_polar(50, 30)
-    ic = encoder(iris_img)
-    code = np.array(ic.code)
+    polar, polar_mask = iris_img.to_polar(50, 30)
+    scale = 3
+    polar = cv.resize(polar, (0, 0), fx=scale, fy=scale)
+    polar_mask = cv.resize(polar_mask, (0, 0), fx=scale, fy=scale)
+    ic = encoder.encode(iris_img)
+    code = ic.masked_image()
     saved = np.array(code)
-    code = code / 2 + 0.5
-    code = np.array(code).reshape((30, -1))
-    st.image([iris_img.image, iris_img.mask*255, code], ['regular', 'polar', 'code'])
-    return saved
+
+    height = 30
+    while height < len(code) and len(code) % height != 0:
+        height += 1
+    code = np.array(code).reshape((height, -1))
+    st.image([iris_img.image, polar, polar_mask*255, code], ['regular', 'polar', 'polar_mask', 'code'])
+    return ic
 
 
-def create_code(item):
-    inner = info['inner']
-    outer = info['outer']
-    lower = info['lower']
-    upper = info['upper']
-    seg = IrisSegmentationDescriptor.from_points(inner, outer, lower, upper)
+def create_code(item, angles=1, angular_spacing=5):
+    seg = IrisSegmentation.from_dict(item['points'])
     img = cv.imread(item['image'], cv.IMREAD_GRAYSCALE)
     iris_img = IrisImage(seg, img)
-    ic = encoder(iris_img)
-    return ic.code
+    ic = encoder.encode(iris_img)
+    if angles == 1:
+        return ic
+    else:
+        angular_spacing_radians = angular_spacing/360 * 2*np.pi
+        codes = []
+        # for a in np.arange(-angles//2*angular_spacing, angles//2*angular_spacing, angular_spacing):
+        #     codes.append(ic.shift(a))
+        for a in np.linspace(-angular_spacing_radians/2*angles, angular_spacing_radians/2*angles, angles):
+            codes.append(encoder.encode(iris_img, start_angle=a))
+        return codes
 
 
 # @st.cache(suppress_st_warning=True)
@@ -57,8 +75,9 @@ def create_codes(data):
     bar = st.progress(0)
     res = []
     for i, item in enumerate(data):
-        res.append(create_code(item))
+        res.append(create_code(item, 7, 5))
         bar.progress(i / len(data))
+    bar.progress(1.0)
     return res
 
 
@@ -92,23 +111,34 @@ with open(os.path.join(base, f'{dataset}.json')) as f:
         info = data['data'][index]
         info2 = data['data'][index2]
         img = cv.imread(info['image'], cv.IMREAD_GRAYSCALE)
-        # img2 = cv.imread(info2['image'], cv.IMREAD_GRAYSCALE)
+        img2 = cv.imread(info2['image'], cv.IMREAD_GRAYSCALE)
 
-        # if img is None or img2 is None:
-        #     raise IOError("Could not open image")
+        if img is None or img2 is None:
+            raise IOError("Could not open image")
 
         c1 = get_code(img, info['points'])
-        # c2 = get_code(img2, info2['points'])
+        c2 = get_code(img2, info2['points'])
+        c2s = create_code(info2, 7, 5)
+        for c in c2s:
+            height = 30
+            while height < len(c.code) and len(c.code) % height != 0:
+                height += 1
+            code = c.masked_image()
+            code = np.array(code).reshape((height, -1))
+            st.image([code], 'code')
+        f'Best: {min(map(c1.dist, c2s))}'
+        # c2 = IrisCode(np.random.choice([-1, 1], c1.code.size))
         # n = ((c1 * c2) == 0).sum()
         # c1[c2 == 0] = 0
         # c2[c1 == 0] = 0
         # dist = (c1 != c2).sum() / (c1.size - n)
         # dist = np.linalg.norm(np.array(c1, np.float64)-np.array(c2, np.float64))
-        # f'Distance: {dist}'
+        f'Distance: {c1.dist(c2)}'
 
     "## Code generation"
     if st.checkbox('Stats'):
         codes = create_codes(data['data'])
+        st.write("Codes created!")
 
         bar = st.progress(0)
         n = len(codes)
@@ -117,9 +147,33 @@ with open(os.path.join(base, f'{dataset}.json')) as f:
         for i in range(n):
             bar.progress(i / n)
             for j in range(n):
-                distance_matrix[i, j] = hamming_distance(codes[i], codes[j])
+                distance_matrix[i, j] = min([ca.dist(cb) for ca, cb in product(codes[i], codes[j])])
+                # distance_matrix[i, j] = codes[i].dist(codes[j])
                 in_data = data['data']
                 info_i = in_data[i]['info']
                 info_j = in_data[j]['info']
                 if info_i['user_id'] == info_j['user_id'] and info_i['eye'] == info_j['eye']:
                     same_mask[i, j] = True
+        bar.progress(1.0)
+        # st.write(same_mask)
+        # st.write(distance_matrix)
+
+        intra_distances = []
+        inter_distances = []
+        for i in range(n):
+            for j in range(n):
+                if i == j:
+                    continue
+                if same_mask[i, j]:
+                    intra_distances.append(distance_matrix[i, j])
+                else:
+                    inter_distances.append(distance_matrix[i, j])
+
+        intra_distances = np.array(intra_distances)
+        inter_distances = np.array(inter_distances)
+        f'**Intra-distance mean:** {np.mean(intra_distances)}'
+        f'**Inter-distance mean:** {np.mean(inter_distances)}'
+
+        sns.distplot(intra_distances)
+        sns.distplot(inter_distances)
+        st.pyplot()

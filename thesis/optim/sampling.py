@@ -13,6 +13,10 @@ import numpy as np
 T = TypeVar('T')
 
 
+def const(val):
+    return np.array([val])
+
+
 def samples_step(start, stop, step=1, *, stratified=True, clip=True):
     """Sample with step intervals. It is functionally comparable to np.arange.
 
