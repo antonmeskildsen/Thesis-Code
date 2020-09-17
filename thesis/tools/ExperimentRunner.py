@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import Dict
 
 import streamlit as st
 
@@ -10,19 +10,18 @@ from glob2 import glob
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import altair as alt
 
 from optim.multi_objective import MultiObjectiveOptimizer, NaiveMultiObjectiveOptimizer, \
     PopulationMultiObjectiveOptimizer, ObfuscationObjective
 
-from thesis.util.st_utils import file_select, type_name, json_to_strategy, progress, file_select_sidebar
-from thesis.util.utilities import load_iris_data, load_gaze_data
+from tools.st_utils import file_select, type_name, json_to_strategy, progress, file_select_sidebar
+from tools.cli.utilities import load_iris_data, load_gaze_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, PopulationInitializer
 from thesis.optim import sampling
-from thesis.optim.filters import bfilter, gfilter, uniform_noise, gaussian_noise
+from thesis.optim.filters import bfilter, gfilter, uniform_noise, gaussian_noise, salt_and_pepper
 from thesis.optim.objective_terms import AbsoluteGradientEntropy, RelativeGradientEntropy, AbsoluteGazeAccuracy, \
-    RelativeGazeAccuracy, IrisCodeSimilarity
+    RelativeGazeAccuracy, IrisCodeSimilarity, ImageSimilarity
 from thesis.optim.population import TruncationSelection, TournamentSelection, UniformCrossover, GaussianMutation
 
 st.title('Obfuscation Experiment')
@@ -32,7 +31,7 @@ feature detection) and iris recognition (accuracy, image entropy, iris code dist
 
 Since there are multiple objectives, the optimisation is focused on finding a pareto frontier defining 
 optimal trade-offs for each obfuscation method applied. Comparing these frontiers makes it possible to 
-compare the methods 
+compare the methods.
 """
 
 """
@@ -62,7 +61,7 @@ st.sidebar.write("""
 """)
 
 iris_metrics = st.sidebar.multiselect('Iris metrics',
-                                      (AbsoluteGradientEntropy, RelativeGradientEntropy, IrisCodeSimilarity),
+                                      (AbsoluteGradientEntropy, RelativeGradientEntropy, IrisCodeSimilarity, ImageSimilarity),
                                       default=(AbsoluteGradientEntropy,), format_func=type_name)
 gaze_metrics = st.sidebar.multiselect('Gaze metrics', (AbsoluteGazeAccuracy, RelativeGazeAccuracy),
                                       default=(AbsoluteGazeAccuracy,), format_func=type_name)
@@ -70,7 +69,7 @@ gaze_metrics = st.sidebar.multiselect('Gaze metrics', (AbsoluteGazeAccuracy, Rel
 iris_terms = list(map(lambda x: x(), iris_metrics))
 gaze_terms = list(map(lambda x: x(), gaze_metrics))
 
-filters = st.sidebar.multiselect('Filter types', (gfilter, bfilter, gaussian_noise, uniform_noise), default=(gfilter,),
+filters = st.sidebar.multiselect('Filter types', (gfilter, bfilter, gaussian_noise, uniform_noise, salt_and_pepper), default=(gfilter,),
                                  format_func=type_name)
 
 st.sidebar.write(

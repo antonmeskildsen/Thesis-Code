@@ -1,16 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
-from collections import Callable
-from dataclasses import dataclass
+from typing import TypeVar
 
 import cv2 as cv
 import numpy as np
 
 from thesis.data import SegmentationSample, GazeImage
-from thesis.information.entropy import gradient_histogram, histogram, entropy
+from entropy import gradient_histogram, histogram, entropy
 from thesis.tracking.gaze import GazeModel
 from thesis.tracking.features import normalize_coordinates
-from thesis.segmentation import IrisCodeEncoder, IrisCode, IrisImage
+from thesis.segmentation import IrisCodeEncoder, IrisImage
 
 
 def bilateral_filter(img, kernel_size, sigma_c, sigma_s):
@@ -80,6 +78,18 @@ class IrisCodeSimilarity(SegmentationTerm):
         filtered_iris_image = IrisImage(sample.image.segmentation, filtered)
         code_filtered = self.encoder.encode(filtered_iris_image)
         return 1-code_sample.dist(code_filtered)
+
+
+class ImageSimilarity(SegmentationTerm):
+
+    def __call__(self, sample: SegmentationSample, filtered: np.ndarray) -> float:
+        sample_masked = sample.image.image * sample.image.mask
+        sample_masked = sample_masked / np.linalg.norm(sample_masked)
+        filtered_masked = filtered * sample.image.mask / 255
+        filtered_masked = filtered_masked / np.linalg.norm(filtered_masked)
+        norm_factor = np.linalg.norm(sample_masked)
+        dist = np.linalg.norm(sample_masked-filtered_masked)
+        return 1 - dist#/norm_factor
 
 
 class AbsoluteGazeAccuracy(GazeTerm):

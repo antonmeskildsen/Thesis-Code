@@ -5,13 +5,10 @@ from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 
 from glob import glob
-import cv2 as cv
-import numpy as np
-import matplotlib.pyplot as plt
 
 from thesis.tracking.features import *
 from thesis.tracking.gaze import BasicGaze
-from thesis.util.utilities import load_json, load_images
+from tools.cli.utilities import load_json, load_images
 from thesis.optim.filters import uniform_noise
 
 import streamlit as st
