@@ -1,16 +1,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, List, Callable, Iterator, Dict
-from tqdm import tqdm
+from typing import List, Callable
 
 import numpy as np
 
-from thesis.data import SegmentationDataset, GazeDataset, SegmentationSample, GazeImage
-from thesis.information.entropy import gradient_histogram, histogram
+from thesis.data import SegmentationDataset, GazeDataset
 from thesis.optim.sampling import Sampler, PopulationInitializer
-from thesis.optim.objective_terms import gradient_entropy, AbsoluteGazeAccuracy, AbsoluteGradientEntropy, \
-    RelativeGazeAccuracy, \
-    GazeTerm, SegmentationTerm
+from thesis.optim.objective_terms import GazeTerm, SegmentationTerm
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
 
 
@@ -43,8 +39,8 @@ class ObfuscationObjective(Objective):
             map(lambda x: type(x).__name__, self.gaze_terms))
 
     def eval(self, params):
-        iris_results = [[]] * len(self.iris_terms)
-        gaze_results = [[]] * len(self.gaze_terms)
+        iris_results = [[] for _ in range(len(self.iris_terms))]
+        gaze_results = [[] for _ in range(len(self.gaze_terms))]
 
         for dataset in self.iris_datasets:
             for sample in dataset.samples:
@@ -58,6 +54,8 @@ class ObfuscationObjective(Objective):
                 for i, term in enumerate(self.gaze_terms):
                     gaze_results[i].append(term(dataset.model, sample, output))
 
+        a = list(map(np.mean, iris_results))
+        b = list(map(np.mean, gaze_results))
         return list(map(np.mean, iris_results)) + list(map(np.mean, gaze_results))
 
     def output_dimensions(self):

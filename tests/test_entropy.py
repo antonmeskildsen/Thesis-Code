@@ -1,6 +1,6 @@
 import numpy as np
 
-from thesis.information import entropy
+import entropy
 
 
 def test_entropy_single_color():

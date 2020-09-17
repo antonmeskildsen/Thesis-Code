@@ -1,9 +1,23 @@
-uniform_noise:
+salt_and_pepper:
   intensity:
     type: samples_num
     params:
       start: 0
       stop: 100
+      num: 5
+  density:
+    type: samples_num
+    params:
+      start: 0.01
+      stop: 0.99
+      num: 10
+
+uniform_noise:
+  intensity:
+    type: samples_num
+    params:
+      start: 0
+      stop: 250
       num: 30
 
 
