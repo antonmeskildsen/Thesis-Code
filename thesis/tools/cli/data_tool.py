@@ -1,21 +1,14 @@
-import enum
-import os
-import re
-import random
-from abc import ABC, abstractmethod
-from typing import Dict, List
-
-import cv2 as cv
-import numpy as np
-from enum import Enum
-from dataclasses import dataclass
-from glob2 import glob
-
-from tqdm import tqdm
 import json
-import click
+import os
+import random
+import re
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
 
-from thesis.segmentation import IrisSegmentation, IrisImage, IrisCode
+import click
+from glob2 import glob
+from tqdm import tqdm
 
 
 class EyeSide(str, Enum):
@@ -56,7 +49,7 @@ class UbirisFormat(DataFormat):
 class CasiaIVFormat(DataFormat):
     @staticmethod
     def get_info(name) -> ImageInfo:
-        matches = re.match(r'S(?P<user_id>[0-9]+)(?P<eye_side>L|R)(?P<image_id>[0-9]+)', name)
+        matches = re.match(r'S(?P<user_id>[0-9]+)(?P<eye_side>[LR])(?P<image_id>[0-9]+)', name)
         # This conversion is done to preserve IDs but keep ID equality between left and right eyes
         eye = EyeSide.RIGHT if matches.group('eye_side') == 'R' else EyeSide.LEFT
         return ImageInfo(
@@ -141,48 +134,11 @@ def create(path, dataset, output, limit):
 
     OUTPUT is the path to the resulting json file.
     """
-    dset = get_segmented_images(dataset, path)
+    dataset = get_segmented_images(dataset, path)
     if limit > 0:
-        dset['data'] = random.sample(dset['data'], limit)
+        dataset['data'] = random.sample(dataset['data'], limit)
     with open(output, 'w') as f:
-        json.dump(dset, f)
-
-
-@data.command()
-@click.argument('path')
-def preview(path):
-    """Preview image and mask.
-
-    PATH is a path to a json dataset."""
-    with open(path) as f:
-        data = json.load(f)['data']
-        while True:
-            index = click.prompt(f'Type an index to view (range 0 to {len(data)})', type=int)
-            if index >= len(data) or index < 0:
-                print(f'Invalid index!')
-                continue
-            point = data[index]
-            img = cv.imread(point['image'])
-            seg = IrisSegmentation.from_dict(point['points'])
-            mask = seg.get_mask((img.shape[1], img.shape[0]))
-            iris_img = IrisImage(seg, img)
-
-            masked = cv.bitwise_and(img, img, mask=iris_img.mask * 255)
-            cv.imshow('Preview', masked)
-
-            polar, mask = iris_img.to_polar(200, 100)
-            cv.imshow('Polar', polar)
-            masked = cv.bitwise_and(polar, polar, mask=mask * 255)
-            cv.imshow('PolarMask', masked)
-
-            code = IrisCode(iris_img)
-
-            code_img = np.array(code.code).reshape((20, -1))
-            print(code.code)
-
-            cv.imshow('Code', code_img)
-
-            cv.waitKey(100)
+        json.dump(dataset, f)
 
 
 @data.group()
@@ -190,16 +146,7 @@ def track():
     pass
 
 
-def combine_json(glints: list, pupils: list, positions: list, calibration_samples: int) -> dict:
-    # if len(glints) != len(pupils) != len(positions):
-    #     raise ValueError("Data files contain different numbers of elements.")
-
-    # combined = [{
-    #     'image': f'{i}.jpg',
-    #     'glints': img_glints,
-    #     'pupil': pupil,
-    #     'position': position
-    # } for i, (img_glints, pupil, position) in enumerate(zip(glints, pupils, positions))]
+def combine_json(positions: list, calibration_samples: int) -> dict:
     combined = [{
         'image': f'{i}.jpg',
         'position': position
@@ -215,30 +162,60 @@ def combine_json(glints: list, pupils: list, positions: list, calibration_sample
 @click.argument('path')
 @click.argument('calibration_samples', type=int)
 def create(path: str, calibration_samples: int):
-    """Create single json file.
+    """Create single json file for gaze data.
 
     PATH: Path to folder containing images and json files.
     OUTPUT: Filename of output json file.
-    CALIBRATION_SAMPLES: Number of images used for calibration."""
-
-    glints_path = os.path.join(path, 'glints.json')
-    pupils_path = os.path.join(path, 'pupils.json')
+    CALIBRATION_SAMPLES: Number of images used for calibration.
+    """
     positions_path = os.path.join(path, 'positions.json')
-    # open(glints_path) as glints_file, open(pupils_path) as pupils_file,
     with open(positions_path) as positions_file:
-        glints = None
-        pupils = None
-        # glints = json.load(glints_file)
-        # pupils = json.load(pupils_file)
         positions = json.load(positions_file)
 
-
-        output_data = combine_json(glints, pupils, positions, calibration_samples)
+        output_data = combine_json(positions, calibration_samples)
 
         with open(os.path.join(path, 'data.json'), 'w') as output_file:
             json.dump(output_data, output_file, indent=4)
 
         print("Created data.json")
+
+
+@data.group()
+def pupil():
+    ...
+
+
+@pupil.command()
+@click.argument('path')
+def create(path):
+    """Create json file for data.
+
+    PATH: Path to base pupil folder.
+    """
+
+    paths = glob(os.path.join(path, '*/*.txt'))
+    print('Found the following datasets:')
+    for p in paths:
+        print(f'\t{p}')
+
+    images = []
+    for file_path in tqdm(paths):
+        directory = os.path.splitext(file_path)[0]
+        with open(file_path) as positions_file:
+            lines = positions_file.readlines()
+            positions = [map(int, line.strip().split()[1:]) for line in lines[1:]]
+            for image, x, y in positions:
+                image_path = os.path.join(directory, f'{image:010d}.png')
+                images.append({
+                    'image': os.path.abspath(image_path),
+                    'position': (x, y)
+                })
+
+    with open(os.path.join(path, 'info.json'), 'w') as output_file:
+        json.dump({
+            'name': 'pupil_std',
+            'data': images
+        }, output_file)
 
 
 if __name__ == '__main__':

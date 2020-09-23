@@ -1,12 +1,12 @@
-from abc import ABC, abstractmethod
-from typing import Tuple, List
-from typing_extensions import Protocol
-import numpy as np
-import cv2 as cv
+from abc import abstractmethod
+from typing import Tuple
 
+import cv2 as cv
+import numpy as np
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import PolynomialFeatures
+from typing_extensions import Protocol
 
 from thesis.tracking import features
 
@@ -29,7 +29,8 @@ class GazeModel:
         """Calibrate the model.
 
         Args:
-            samples:
+            gaze_positions:
+            images:
         """
         ...
 
@@ -86,8 +87,8 @@ def solve_affine(source, target):
 
 
 def solve_homography(source, target):
-    hom, mask = cv.findHomography(source, target, 0)
-    return hom
+    homography, mask = cv.findHomography(source, target, 0)
+    return homography
 
 
 def hom(points):
@@ -100,7 +101,7 @@ def hom(points):
 
 
 class BasicGaze(GazeModel):
-    def __init__(self, glint_args=None, model: Pipeline = None):
+    def __init__(self, glint_args=None, model: Pipeline = None, pupil_detector=features.pupil_detector):
         if glint_args is None:
             self.glint_args = {}
         else:
@@ -113,6 +114,7 @@ class BasicGaze(GazeModel):
 
         super().__init__()
         self.model = model
+        self.pupil_detector = pupil_detector
 
     def _preprocess(self, images):
         # images = np.array([cv.GaussianBlur(img, (0, 0), 0.5) for img in images])
@@ -120,7 +122,7 @@ class BasicGaze(GazeModel):
         if len(images.shape) == 2:
             images = [images]
 
-        pupils = np.array([features.pupil_detector(img) for img in images])
+        pupils = np.array([self.pupil_detector(img) for img in images])
 
         # print(pupils[0])
         centers = [[p[0], p[1]] for p in pupils]
@@ -138,42 +140,6 @@ class BasicGaze(GazeModel):
                 normed.append([-1, -1])
             else:
                 normed.append([c[0] - g[0, 0], c[1] - g[0, 1]])
-
-        # print(normed)
-
-        scale_x = 1
-        scale_y = 1
-
-        # for c, g in zip(centers, glints):
-        #     if len(g) > 0:
-        #         p = (c - g[0]) / np.linalg.norm(c - g[0])
-        #
-        #     if len(glints) > 1:
-        #         a = g[0]
-        #         b = g[1]
-        #
-        #         vec = (a - b) / np.linalg.norm(a - b)
-        #         if vec.dot([0, 1]) < vec.dot([1, 0]):
-        #             arr = np.array([[0, 0], [0, 1]])
-        #             scale_x
-        #         else:
-        #             arr = np.array([[0, 0], [1, 0]])
-        #
-        #         sim = solve_similarity(g[:2], arr)
-        #         p = sim.dot(hom(c))
-        #
-        #     if len(glints) > 2:
-        #         scale_x = np.linalg.norm(g[0] - g[1])
-        #         scale_y = np.linalg.norm(g[1] - g[2])
-        #         aff = solve_affine(glints[:3], np.array([[0, 0], [1, 0], [1, 1]]))
-        #         # st.write(aff)
-        #         p = aff.dot(hom(p))
-
-        # if np.isnan(g).any():
-        #     normed.append(c - avg)
-        # else:
-        #     normed.append(c - g)
-        # print(centers)
 
         return np.array(normed)
 

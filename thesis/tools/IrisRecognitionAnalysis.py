@@ -1,17 +1,10 @@
+import json
+import os
+
+import matplotlib.pyplot as plt
+import numpy as np
 import streamlit as st
 
-import os
-from collections import defaultdict
-import json
-import numpy as np
-import cv2 as cv
-from glob2 import glob
-from itertools import product
-
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-from thesis.segmentation import IrisImage, IrisSegmentation, IrisCodeEncoder, IrisCode
 from thesis.tools.st_utils import file_select
 
 """
@@ -45,9 +38,4 @@ plt.scatter(far, frr)
 plt.xlabel('FAR')
 plt.ylabel('FRR')
 plt.grid()
-# plt.xscale('log')
-# plt.yscale('log')
-# plt.axis(xmin=10**-4, xmax=1, ymin=10**-2)
-# st.write(far)
-# st.write(frr)
 st.pyplot()
