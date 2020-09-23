@@ -11,6 +11,8 @@ from thesis.tracking.gaze import BasicGaze
 from tools.cli.utilities import load_json, load_images
 from thesis.optim.filters import uniform_noise
 
+import matplotlib.pyplot as plt
+
 import streamlit as st
 
 st.title('Gaze experiments')
@@ -135,7 +137,7 @@ if st.sidebar.checkbox('Calc gaze'):
         plt.figure()
         pupils = np.array([pupil_detector(img) for img in images])
         centers = [p[:2] for p in pupils]
-        glints = [
+        all_glints = [
             find_glints(img, center)
             for img, center in zip(images, centers)
         ]
@@ -143,7 +145,7 @@ if st.sidebar.checkbox('Calc gaze'):
         # nan_removed = np.array([g for g in glints if ~np.isnan(g).any()])
         # avg = nan_removed.mean(axis=0)
         normed = []
-        for i, (c, g) in enumerate(zip(centers, glints)):
+        for i, (c, g) in enumerate(zip(centers, all_glints)):
             # print(i)
             normed.append([c[0] - g[0, 0], c[1] - g[0, 1]])
         normed = np.array(normed)

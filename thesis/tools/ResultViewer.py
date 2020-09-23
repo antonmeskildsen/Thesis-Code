@@ -17,10 +17,8 @@ file_path = file_select('Result file', os.path.join('results', '*.json'))
 with open(file_path) as file:
     results = json.load(file)
 
-
 frame = pd.DataFrame(results['results'])
 st.write(frame)
-
 
 st.sidebar.write("# Display settings")
 x = st.sidebar.selectbox('X-axis', frame.columns, index=0)
@@ -44,8 +42,6 @@ c = c + alt.Chart(frame[frame['k'] == k]).mark_line().encode(
     color='filter'
 ).transform_filter(alt.datum.pareto).interactive()
 st.altair_chart(c, use_container_width=True)
-
-
 
 '## Performance analysis'
 threshold = st.slider('Maximum gaze error', 0.0, 2.0, 1.0)
