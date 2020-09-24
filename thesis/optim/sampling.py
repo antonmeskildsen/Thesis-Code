@@ -1,12 +1,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import reduce
-
+from itertools import cycle
 from itertools import product
 from typing import *
-from typing_extensions import Protocol
-import random
-from itertools import cycle
 
 import numpy as np
 
@@ -17,7 +14,7 @@ def const(val):
     return np.array([val])
 
 
-def samples_step(start, stop, step=1, *, stratified=True, clip=True):
+def samples_step(start, stop, step=1, *, stratified=True):
     """Sample with step intervals. It is functionally comparable to np.arange.
 
     Args:
@@ -25,7 +22,6 @@ def samples_step(start, stop, step=1, *, stratified=True, clip=True):
         stop:
         step:
         stratified:
-        clip:
 
     Returns:
 
@@ -36,7 +32,7 @@ def samples_step(start, stop, step=1, *, stratified=True, clip=True):
     return nums
 
 
-def samples_num(start, stop, num, *, stratified=True, clip=True):
+def samples_num(start, stop, num, *, stratified=True):
     """Create sample of specific size. It is functionally comparable to np.linspace.
 
     Args:
@@ -44,7 +40,6 @@ def samples_num(start, stop, num, *, stratified=True, clip=True):
         stop:
         num:
         stratified:
-        clip:
 
     Returns:
 
@@ -56,7 +51,7 @@ def samples_num(start, stop, num, *, stratified=True, clip=True):
     return nums.clip(start, stop)
 
 
-def samples_exp(start, stop, num, exp, *, stratified=True, clip=True):
+def samples_exp(start, stop, num, exp, *, stratified=True):
     """Create exponentially spaced samples.
 
         Args:
@@ -65,7 +60,6 @@ def samples_exp(start, stop, num, exp, *, stratified=True, clip=True):
             num:
             exp:
             stratified:
-            clip:
 
         Returns:
 
@@ -78,11 +72,11 @@ def samples_exp(start, stop, num, exp, *, stratified=True, clip=True):
     return nums.clip(start, stop)
 
 
-def samples_uniform(a, b, num, *, stratified=True, clip=True):
+def samples_uniform(a, b, num):
     return np.random.uniform(a, b, num)
 
 
-def samples_normal(sigma, mean, num, *, stratified=True, clip=True):
+def samples_normal(sigma, mean, num):
     return np.random.normal(mean, sigma, num)
 
 

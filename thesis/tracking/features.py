@@ -1,8 +1,5 @@
-import numpy as np
-from typing import Tuple
-
 import cv2 as cv
-import matplotlib.pyplot as plt
+import numpy as np
 
 
 def pupil_detector(input, debug=False):
