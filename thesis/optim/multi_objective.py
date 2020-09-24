@@ -54,8 +54,6 @@ class ObfuscationObjective(Objective):
                 for i, term in enumerate(self.gaze_terms):
                     gaze_results[i].append(term(dataset.model, sample, output))
 
-        a = list(map(np.mean, iris_results))
-        b = list(map(np.mean, gaze_results))
         return list(map(np.mean, iris_results)) + list(map(np.mean, gaze_results))
 
     def output_dimensions(self):
@@ -103,7 +101,7 @@ class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer):
 
         m = self.objective.output_dimensions()
         m_pop = len(pop)
-        m_subpop = m_pop // m + 1  # TODO: Check for correct solution (is it important to get len(parents)==m_pop?
+        m_sub_pop = m_pop // m + 1  # TODO: Check for correct solution (is it important to get len(parents)==m_pop?
 
         iterator = range(self.iterations)
         if wrapper is not None:
@@ -117,12 +115,12 @@ class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer):
             parents = []
             for i in range(m):
                 selected = self.selection_method.select([y[i] for y in ys])
-                parents.extend(selected[:m_subpop])
+                parents.extend(selected[:m_sub_pop])
 
             p = np.random.choice(m_pop * 2, m_pop * 2, False)
 
-            def p_ind(i):
-                return parents[p[i] % m_pop][p[i] // m_pop]
+            def p_ind(idx):
+                return parents[p[idx] % m_pop][p[idx] // m_pop]
 
             parents = [(p_ind(i), p_ind(i + 1)) for i in range(0, 2 * m_pop, 2)]
             pop_values = [list(p.values()) for p in pop]

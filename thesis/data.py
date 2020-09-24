@@ -95,3 +95,34 @@ class SegmentationDataset:
                 name = 'unnamed'
 
             return SegmentationDataset(name, list(images))
+
+
+@dataclass
+class PupilSample:
+    image: np.ndarray
+    center: (int, int)
+
+    @staticmethod
+    def from_json(path: str, data: dict):
+        image = cv.imread(os.path.join(path, data['image']), cv.IMREAD_GRAYSCALE)
+        screen_position = data['position']
+        return GazeImage(image, screen_position)
+
+
+@dataclass
+class PupilDataset:
+    name: str
+    samples: List[PupilSample]
+
+    @staticmethod
+    def from_path(path: str) -> SegmentationDataset:
+        with open(path) as file:
+            data = json.load(file)
+            images = map(SegmentationSample.from_dict, data['data'])
+
+            if 'name' in data:
+                name = data['name']
+            else:
+                name = 'unnamed'
+
+            return SegmentationDataset(name, list(images))

@@ -1,18 +1,12 @@
-import streamlit as st
-
-import os
-from collections import defaultdict
 import json
+import os
+
+import matplotlib.pyplot as plt
 import numpy as np
-import cv2 as cv
-from glob2 import glob
-from itertools import product
+import seaborn as sns
+import streamlit as st
 from scipy import stats
 
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-from thesis.segmentation import IrisImage, IrisSegmentation, IrisCodeEncoder, IrisCode
 from thesis.tools.st_utils import file_select
 
 """
@@ -114,4 +108,3 @@ if log_scale:
 # st.write(frr)
 plt.legend()
 st.pyplot()
-

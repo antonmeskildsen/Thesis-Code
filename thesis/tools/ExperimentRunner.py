@@ -19,7 +19,7 @@ from tools.st_utils import file_select, type_name, json_to_strategy, progress, f
 from tools.cli.utilities import load_iris_data, load_gaze_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, PopulationInitializer
 from thesis.optim import sampling
-from thesis.optim.filters import bfilter, gfilter, uniform_noise, gaussian_noise, salt_and_pepper
+from thesis.optim.filters import bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, salt_and_pepper
 from thesis.optim.objective_terms import AbsoluteGradientEntropy, RelativeGradientEntropy, AbsoluteGazeAccuracy, \
     RelativeGazeAccuracy, IrisCodeSimilarity, ImageSimilarity
 from thesis.optim.population import TruncationSelection, TournamentSelection, UniformCrossover, GaussianMutation
@@ -61,7 +61,8 @@ st.sidebar.write("""
 """)
 
 iris_metrics = st.sidebar.multiselect('Iris metrics',
-                                      (AbsoluteGradientEntropy, RelativeGradientEntropy, IrisCodeSimilarity, ImageSimilarity),
+                                      (AbsoluteGradientEntropy, RelativeGradientEntropy, IrisCodeSimilarity,
+                                       ImageSimilarity),
                                       default=(AbsoluteGradientEntropy,), format_func=type_name)
 gaze_metrics = st.sidebar.multiselect('Gaze metrics', (AbsoluteGazeAccuracy, RelativeGazeAccuracy),
                                       default=(AbsoluteGazeAccuracy,), format_func=type_name)
@@ -69,7 +70,9 @@ gaze_metrics = st.sidebar.multiselect('Gaze metrics', (AbsoluteGazeAccuracy, Rel
 iris_terms = list(map(lambda x: x(), iris_metrics))
 gaze_terms = list(map(lambda x: x(), gaze_metrics))
 
-filters = st.sidebar.multiselect('Filter types', (gfilter, bfilter, gaussian_noise, uniform_noise, salt_and_pepper), default=(gfilter,),
+filters = st.sidebar.multiselect('Filter types',
+                                 (gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper),
+                                 default=(gaussian_filter,),
                                  format_func=type_name)
 
 st.sidebar.write(
@@ -84,11 +87,11 @@ projected_iterations = 0
 
 
 def make_strategy(data, num):
-    params, generators = [], []
+    parameters, generators = [], []
     for k, v in data.items():
-        params.append(k)
+        parameters.append(k)
         generators.append(getattr(sampling, v['type'])(**v['params'], num=num))
-    return params, generators
+    return parameters, generators
 
 
 params = {}
@@ -112,7 +115,7 @@ elif method == PopulationMultiObjectiveOptimizer:
         config = yaml.safe_load(config_file)
     st.write(config)
     params['configuration'] = config
-    k = st.sidebar.number_input('K', 0, 10, 5)
+    generations = st.sidebar.number_input('Generations (K)', 0, 10, 5)
     iterations = st.sidebar.number_input('Iterations', 1, 100, 2)
     selection = st.sidebar.selectbox('Selection technique', (TruncationSelection, TournamentSelection),
                                      format_func=type_name)
@@ -134,8 +137,8 @@ elif method == PopulationMultiObjectiveOptimizer:
             means.append(param['mutation']['mean'])
         mutation = GaussianMutation(np.array(sigmas), np.array(means))
 
-        optimizers[f.__name__] = PopulationMultiObjectiveOptimizer([], objective, selection(k), crossover(), mutation,
-                                                                   iterations, init)
+        optimizers[f.__name__] = PopulationMultiObjectiveOptimizer([], objective, selection(generations), crossover(),
+                                                                   mutation, iterations, init)
 
 "### Summary"
 f'Expected number of iterations: {projected_iterations}'
@@ -144,6 +147,9 @@ st.sidebar.write("""
 ## Export
 """)
 path = 'results'
+new_path = ''
+name = ''
+description = ''
 should_export = st.sidebar.checkbox('Export results')
 if should_export:
     name = st.sidebar.text_input('Experiment name')
@@ -178,7 +184,8 @@ if st.button('Start experiment'):
         metrics = o.metrics()
         pareto = [o.pareto_frontier(k) for k in range(max([m[2] for m in metrics]) + 1)]
 
-        metrics_df = [{**a, **b, 'pareto': i in pareto[k], 'filter': filter_name, 'k': k} for i, (a, b, k) in
+        metrics_df = [{**a, **b, 'pareto': i in pareto[generations], 'filter': filter_name, 'k': generations} for
+                      i, (a, b, generations) in
                       enumerate(metrics)]
         results.extend(metrics_df)
         # results[filter_name] = metrics_df
