@@ -94,30 +94,13 @@ class IrisCode:
     code: np.ndarray
     mask: np.ndarray
 
-    # def __init__(self, iris_image: IrisImage,
-    #              scales: int = 3,
-    #              angles: int = 3,
-    #              frequency_scale_base=2):
-    #     polar, polar_mask = iris_image.to_polar(20, 5)
-    #     polar = np.float64(polar)
-    #     res = []
-    #     for s in range(1, scales + 1):
-    #         frequency_scale = frequency_scale_base / 2 ** s
-    #         for t in np.linspace(0, np.pi - (np.pi / angles), angles):
-    #             real, imag = gabor(polar, frequency_scale, theta=t, bandwidth=0.1, mode='wrap')
-    #             real = np.sign(real)
-    #             imag = np.sign(imag)
-    #             real[polar_mask == 0] = 0
-    #             imag[polar_mask == 0] = 0
-    #             res.extend(real.reshape(-1))
-    #             res.extend(imag.reshape(-1))
-    #
-    #     self.code = np.array(res)
-
     def dist(self, other):
         mask = self.mask | other.mask
         n = mask.sum()
-        return (self.code != other.code)[mask == 0].sum() / (len(self) - n)
+        if n == len(self):
+            return 1
+        else:
+            return (self.code != other.code)[mask == 0].sum() / (len(self) - n)
 
     def __len__(self):
         return self.code.size
@@ -154,9 +137,10 @@ class IrisCodeEncoder:
                 kernel = cv.getGaborKernel((k, k), sigma, theta=t, lambd=wavelength, gamma=1, psi=np.pi * 0.5,
                                            ktype=cv.CV_64F)
                 self.kernels.append(kernel)
-                # kernel = cv.getGaborKernel((5, 5), sigma=frequency_scale, theta=t + np.pi / 2, lambd=frequency_scale, gamma=1,
-                #                            psi=np.pi * 0.5, ktype=cv.CV_64F)
+                # kernel = cv.getGaborKernel((k, k), sigma, theta=t + np.pi/4, lambd=wavelength, gamma=1, psi=np.pi * 0.5,
+                #                            ktype=cv.CV_64F)
                 # self.kernels.append(kernel)
+
             wavelength *= mult
 
     def encode(self, image, start_angle=0):

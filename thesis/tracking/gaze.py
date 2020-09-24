@@ -129,6 +129,10 @@ class BasicGaze(GazeModel):
             for img, center in zip(images, centers)
         ]
 
+        glints = [
+            min(gs, key=lambda g: g[1]) if len(gs) > 0 else [] for gs in glints
+        ]
+
         # nan_removed = np.array([g for g in glints if ~np.isnan(g).any()])
         # avg = nan_removed.mean(axis=0)
         normed = []
@@ -137,7 +141,7 @@ class BasicGaze(GazeModel):
             if len(g) == 0:
                 normed.append([-1, -1])
             else:
-                normed.append([c[0] - g[0, 0], c[1] - g[0, 1]])
+                normed.append([c[0] - g[0], c[1] - g[1]])
 
         # print(normed)
 

@@ -15,8 +15,8 @@ from thesis.segmentation import IrisImage, IrisSegmentation, IrisCodeEncoder, Ir
 
 "# Explorer"
 
-# base = '/home/anton/data/eyedata/iris'
-base = '/Users/Anton/Desktop/data/iris'
+base = '/home/anton/data/eyedata/iris'
+# base = '/Users/Anton/Desktop/data/iris'
 
 files = glob(os.path.join(base, '*.json'))
 names = [os.path.basename(p).split('.')[0] for p in files]
@@ -25,12 +25,17 @@ dataset = st.selectbox('Dataset', names)
 
 scales = st.sidebar.slider('Scales', 1, 10, 6)
 angles = st.sidebar.slider('Angles', 1, 20, 6)
-wavelength = st.sidebar.slider('Wavelength Base', 0.0, 10.0, 0.5)
-mult = st.sidebar.slider('Wavelength multiplier', 1.0, 5.0, 1.41)
-angular = st.sidebar.slider('Angular Resolution', 5, 100, 30, 2)
-radial = st.sidebar.slider('Radial Resolution', 2, 50, 18, 2)
+wavelength = st.sidebar.number_input('Wavelength Base', 0.0, 10.0, 0.5)
+mult = st.sidebar.number_input('Wavelength multiplier', 1.0, 5.0, 1.81)
+angular = st.sidebar.slider('Angular Resolution', 5, 100, 30, 1)
+radial = st.sidebar.slider('Radial Resolution', 2, 50, 18, 1)
 
-encoder = IrisCodeEncoder(scales, angles, angular, radial, wavelength, mult)
+angle_tests = st.sidebar.number_input('Test angles', 1, 20, 7)
+spacing = st.sidebar.number_input('Angular spacing', 0, 20, 5)
+
+eps = st.sidebar.number_input('Epsilon', 0.0, 20.0, 0.01)
+
+encoder = IrisCodeEncoder(scales, angles, angular, radial, wavelength, mult, eps)
 
 
 def get_code(img, info):
@@ -75,7 +80,7 @@ def create_codes(data):
     bar = st.progress(0)
     res = []
     for i, item in enumerate(data):
-        res.append(create_code(item, 7, 5))
+        res.append(create_code(item, angle_tests, spacing))
         bar.progress(i / len(data))
     bar.progress(1.0)
     return res
@@ -118,14 +123,15 @@ if st.checkbox('Compare'):
 
     c1 = get_code(img, info['points'])
     c2 = get_code(img2, info2['points'])
-    c2s = create_code(info2, 7, 5)
+
+    c2s = create_code(info2, angle_tests, spacing)
     for c in c2s:
         height = 30
         while height < len(c.code) and len(c.code) % height != 0:
             height += 1
         code = c.masked_image()
         code = np.array(code).reshape((height, -1))
-        st.image([code], 'code')
+        # st.image([code], 'code')
     f'Best: {min(map(c1.dist, c2s))}'
     # c2 = IrisCode(np.random.choice([-1, 1], c1.code.size))
     # n = ((c1 * c2) == 0).sum()
@@ -151,7 +157,8 @@ if st.checkbox('Stats'):
     for i in range(n):
         bar.progress(i / n)
         for j in range(n):
-            distance_matrix[i, j] = min([ca.dist(cb) for ca, cb in product(codes[i], codes[j])])
+            distance_matrix[i, j] = min([codes[i][angle_tests//2].dist(cb) for cb in codes[j]])
+            # distance_matrix[i, j] = min([ca.dist(cb) for ca, cb in product(codes[i], codes[j])])
             # distance_matrix[i, j] = codes[i].dist(codes[j])
             in_data = data['data']
             info_i = in_data[i]['info']
