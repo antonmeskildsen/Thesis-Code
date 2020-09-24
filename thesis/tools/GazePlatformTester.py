@@ -4,6 +4,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 
+from scipy import stats
+
 from glob import glob
 
 from thesis.tracking.features import *
@@ -16,7 +18,8 @@ import streamlit as st
 st.title('Gaze experiments')
 
 # path = '/home/anton/data/cap04'
-sets = glob(os.path.join('/Users/Anton/Desktop/data/caps/', '*/'))
+# sets = glob(os.path.join('/Users/Anton/Desktop/data/caps/', '*/'))
+sets = glob(os.path.join('/home/anton/data/eyedata/gaze', '**/'), recursive=True)
 path = st.selectbox('Dataset', sets)
 
 gaze_positions = load_json(path, 'positions')
@@ -27,11 +30,11 @@ HEIGHT = 2160
 images = load_images(path)
 images = [cv.cvtColor(img, cv.COLOR_BGR2GRAY) for img in images]
 
-camera_matrix = np.load('thesis/util/cam/cameraMatrix.npy')
-dist_coeffs = np.load('thesis/util/cam/distCoeffs.npy')
-rms = np.load('thesis/util/cam/rms.npy')
-rvecs = np.load('thesis/util/cam/rvecs.npy')
-tvecs = np.load('thesis/util/cam/tvecs.npy')
+camera_matrix = np.load('thesis/tools/cam/cameraMatrix.npy')
+dist_coeffs = np.load('thesis/tools/cam/distCoeffs.npy')
+rms = np.load('thesis/tools/cam/rms.npy')
+rvecs = np.load('thesis/tools/cam/rvecs.npy')
+tvecs = np.load('thesis/tools/cam/tvecs.npy')
 
 if st.sidebar.checkbox('Remove distortion'):
     new_mat, roi = cv.getOptimalNewCameraMatrix(camera_matrix, dist_coeffs, (640, 480), 0)
@@ -50,8 +53,7 @@ if st.sidebar.checkbox('Bilateral filter'):
     idx = st.number_input('Image', 0, len(images), 0)
     st.image(images[int(idx)], 'Sample')
 
-
-st.sidebar.write("# Filter")
+st.sidebar.markdown("# Filter")
 filter_choice = st.sidebar.selectbox('Obfuscation filter', ('uniform noise',))
 if filter_choice == 'uniform noise':
     intensity = st.sidebar.slider('Noise intensity', 0, 128, 10)
@@ -61,10 +63,11 @@ if filter_choice == 'uniform noise':
 def show(img, **kwargs):
     pup, th = pupil_detector(img, debug=True)
     glints, timg = find_glints(img, pup[:2], debug=True, **kwargs)
+    gl = min(glints, key=lambda g: g[1]) if len(glints) > 0 else []
     rgb_img = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+    cv.drawMarker(rgb_img, (int(pup[1]), int(pup[0])), (0, 50, 255), cv.MARKER_STAR, 40, 2)
     if len(glints) > 0:
-        glints = glints[[0]]
-        cv.drawMarker(rgb_img, (int(pup[1]), int(pup[0])), (0, 50, 255), cv.MARKER_STAR, 40, 2)
+        glints = np.array([gl]) #glints[[0]]
         glints = sorted(glints, key=lambda g: g[0] + g[1])
         for i, g in enumerate(glints):
             cv.drawMarker(rgb_img, (int(g[1]), int(g[0])), (255 - i * 70, i * 70, 0), cv.MARKER_CROSS, 20, 2)
@@ -127,9 +130,10 @@ if st.sidebar.checkbox('Calc gaze'):
 
     e = np.abs(err(test_X, test_y)).mean(axis=0)
     st.write(e)
-
     d = norm_err(test_X, test_y).mean(axis=0)
     st.write(d)
+
+    st.write(np.median(norm_err(test_X, test_y), axis=0))
 
     if st.sidebar.checkbox('Display pupil positions'):
         plt.figure()
