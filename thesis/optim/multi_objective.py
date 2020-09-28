@@ -4,9 +4,9 @@ from typing import List, Callable
 
 import numpy as np
 
-from thesis.data import SegmentationDataset, GazeDataset
+from thesis.data import SegmentationDataset, GazeDataset, PupilDataset
 from thesis.optim.sampling import Sampler, PopulationInitializer
-from thesis.optim.objective_terms import GazeTerm, SegmentationTerm
+from thesis.optim.objective_terms import GazeTerm, SegmentationTerm, PupilTerm
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
 
 
@@ -30,9 +30,11 @@ class ObfuscationObjective(Objective):
     filter: Callable
     iris_datasets: List[SegmentationDataset]
     gaze_datasets: List[GazeDataset]
+    pupil_datasets: List[PupilDataset]
 
     iris_terms: List[SegmentationTerm]
     gaze_terms: List[GazeTerm]
+    pupil_terms: List[PupilTerm]
 
     def metrics(self) -> List[str]:
         return list(map(lambda x: type(x).__name__, self.iris_terms)) + list(
@@ -41,6 +43,7 @@ class ObfuscationObjective(Objective):
     def eval(self, params):
         iris_results = [[] for _ in range(len(self.iris_terms))]
         gaze_results = [[] for _ in range(len(self.gaze_terms))]
+        pupil_results = [[] for _ in range(len(self.pupil_terms))]
 
         for dataset in self.iris_datasets:
             for sample in dataset.samples:
@@ -53,6 +56,12 @@ class ObfuscationObjective(Objective):
                 output = self.filter(sample.image, **params)
                 for i, term in enumerate(self.gaze_terms):
                     gaze_results[i].append(term(dataset.model, sample, output))
+
+        for dataset in self.pupil_datasets:
+            for sample in dataset.samples:
+                output = self.filter(sample.image, **params)
+                for i, term in enumerate(self.pupil_terms):
+                    pupil_results[i].append(term(sample, output))
 
         return list(map(np.mean, iris_results)) + list(map(np.mean, gaze_results))
 

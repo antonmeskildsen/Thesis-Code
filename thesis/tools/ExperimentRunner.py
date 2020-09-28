@@ -16,12 +16,14 @@ from optim.multi_objective import MultiObjectiveOptimizer, NaiveMultiObjectiveOp
     PopulationMultiObjectiveOptimizer, ObfuscationObjective
 
 from tools.st_utils import file_select, type_name, json_to_strategy, progress, file_select_sidebar
-from tools.cli.utilities import load_iris_data, load_gaze_data
+from tools.cli.utilities import load_iris_data, load_gaze_data, load_pupil_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, PopulationInitializer
 from thesis.optim import sampling
 from thesis.optim.filters import bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, salt_and_pepper
 from thesis.optim.objective_terms import AbsoluteGradientEntropy, RelativeGradientEntropy, AbsoluteGazeAccuracy, \
-    RelativeGazeAccuracy, IrisCodeSimilarity, ImageSimilarity
+    RelativeGazeAccuracy, IrisCodeSimilarity, ImageSimilarity, AbsolutePupilDistanceBaseAlgorithm, \
+    AbsolutePupilDistanceElse, AbsolutePupilDistanceExcuse, RelativePupilDistanceBaseAlgorithm, \
+    RelativePupilDistanceElse, RelativePupilDistanceExcuse
 from thesis.optim.population import TruncationSelection, TournamentSelection, UniformCrossover, GaussianMutation
 
 st.title('Obfuscation Experiment')
@@ -43,8 +45,14 @@ config_file = file_select('Data configuration file', 'configs/data/*.yaml')
 with open(config_file) as config_file:
     config = yaml.safe_load(config_file)
 
-gaze_data = load_gaze_data(config['gaze_data'])
-iris_data = load_iris_data(config['iris_data'])
+
+@st.cache
+def load_data():
+    return load_gaze_data(config['gaze_data']), load_iris_data(config['iris_data']), \
+           load_pupil_data(config['pupil_data'])
+
+
+gaze_data, iris_data, pupil_data = load_data()
 
 '**Gaze data:**'
 f = [(g.name, len(g.test_samples), len(g.calibration_samples)) for g in gaze_data]
@@ -53,6 +61,11 @@ st.write(f)
 
 '**Iris data:**'
 f = [(g.name, len(g.samples)) for g in iris_data]
+f = pd.DataFrame(f, columns=['Name', 'Samples'])
+st.write(f)
+
+'**Pupil data:**'
+f = [(g.name, len(g.samples)) for g in pupil_data]
 f = pd.DataFrame(f, columns=['Name', 'Samples'])
 st.write(f)
 
@@ -66,9 +79,15 @@ iris_metrics = st.sidebar.multiselect('Iris metrics',
                                       default=(AbsoluteGradientEntropy,), format_func=type_name)
 gaze_metrics = st.sidebar.multiselect('Gaze metrics', (AbsoluteGazeAccuracy, RelativeGazeAccuracy),
                                       default=(AbsoluteGazeAccuracy,), format_func=type_name)
+pupil_metrics = st.sidebar.multiselect('Pupil metrics',
+                                       (AbsolutePupilDistanceBaseAlgorithm, AbsolutePupilDistanceElse,
+                                        AbsolutePupilDistanceExcuse, RelativePupilDistanceBaseAlgorithm,
+                                        RelativePupilDistanceElse, RelativePupilDistanceExcuse),
+                                       default=(AbsolutePupilDistanceElse,), format_func=type_name)
 
 iris_terms = list(map(lambda x: x(), iris_metrics))
 gaze_terms = list(map(lambda x: x(), gaze_metrics))
+pupil_terms = list(map(lambda x: x(), pupil_metrics))
 
 filters = st.sidebar.multiselect('Filter types',
                                  (gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper),
@@ -80,7 +99,7 @@ st.sidebar.write(
     ## Optimizer setup
     """)
 method = st.sidebar.selectbox('Type', (NaiveMultiObjectiveOptimizer, PopulationMultiObjectiveOptimizer),
-                              format_func=lambda x: x.__name__, index=1)
+                              format_func=lambda x: x.__name__, index=0)
 
 optimizers: Dict[str, MultiObjectiveOptimizer] = {}
 projected_iterations = 0
@@ -104,7 +123,7 @@ if method == NaiveMultiObjectiveOptimizer:
     sampling = st.sidebar.selectbox('Sampling technique', (GridSearch, UniformSampler), format_func=type_name)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, iris_terms, gaze_terms)
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms, pupil_terms)
         sampler: Sampler = sampling(*json_to_strategy(config[f.__name__]))
         projected_iterations += len(sampler)
         optimizers[f.__name__] = method([], objective, sampler)
@@ -127,7 +146,7 @@ elif method == PopulationMultiObjectiveOptimizer:
     projected_iterations = iterations * pop_num * len(filters)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, iris_terms, gaze_terms)
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms, pupil_terms)
         init = PopulationInitializer(*make_strategy(config[f.__name__], pop_num))
 
         sigmas = []

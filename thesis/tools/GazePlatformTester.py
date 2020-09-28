@@ -19,9 +19,8 @@ import streamlit as st
 
 st.title('Gaze experiments')
 
-# path = '/home/anton/data/cap04'
-# sets = glob(os.path.join('/Users/Anton/Desktop/data/caps/', '*/'))
-sets = glob(os.path.join('/home/anton/data/eyedata/gaze', '**/'), recursive=True)
+sets = glob(os.path.join('/Users/Anton/Desktop/data/gaze', '**/'), recursive=True)
+# sets = glob(os.path.join('/home/anton/data/eyedata/gaze', '**/'), recursive=True)
 path = st.selectbox('Dataset', sets)
 
 gaze_positions = load_json(path, 'positions')
@@ -156,21 +155,21 @@ if st.sidebar.checkbox('Calc gaze'):
         plt.scatter(normed[:, 1], normed[:, 0])
         st.pyplot()
 
-    plt.figure()
+    fig, ax = plt.subplots()
     ny = normalize_coordinates(test_y, HEIGHT, WIDTH)
-    plt.scatter(ny[:, 0], ny[:, 1])
+    ax.scatter(ny[:, 0], ny[:, 1])
 
     pred_y = model.predict(test_X)
-    plt.scatter(pred_y[:, 0], pred_y[:, 1])
-    st.pyplot()
+    ax.scatter(pred_y[:, 0], pred_y[:, 1])
+    st.pyplot(fig)
 
-    plt.figure()
+    fig, ax = plt.subplots()
     ny = normalize_coordinates(train_y, HEIGHT, WIDTH)
-    plt.scatter(ny[:, 0], ny[:, 1])
+    ax.scatter(ny[:, 0], ny[:, 1])
 
     pred_y = model.predict(train_X)
-    plt.scatter(pred_y[:, 0], pred_y[:, 1])
-    st.pyplot()
+    ax.scatter(pred_y[:, 0], pred_y[:, 1])
+    st.pyplot(fig)
 
 # thresh 184, radius 106, min_area 20, min_ratio 0.64
 
