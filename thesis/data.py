@@ -103,10 +103,10 @@ class PupilSample:
     center: (int, int)
 
     @staticmethod
-    def from_json(path: str, data: dict):
-        image = cv.imread(os.path.join(path, data['image']), cv.IMREAD_GRAYSCALE)
+    def from_json(data: dict) -> PupilSample:
+        image = cv.imread(data['image'], cv.IMREAD_GRAYSCALE)
         screen_position = data['position']
-        return GazeImage(image, screen_position)
+        return PupilSample(image, screen_position)
 
 
 @dataclass
@@ -115,14 +115,14 @@ class PupilDataset:
     samples: List[PupilSample]
 
     @staticmethod
-    def from_path(path: str) -> SegmentationDataset:
+    def from_path(path: str) -> PupilDataset:
         with open(path) as file:
             data = json.load(file)
-            images = map(SegmentationSample.from_dict, data['data'])
+            images = map(PupilSample.from_json, data['data'])
 
             if 'name' in data:
                 name = data['name']
             else:
                 name = 'unnamed'
 
-            return SegmentationDataset(name, list(images))
+            return PupilDataset(name, list(images))

@@ -8,7 +8,7 @@ def pupil_detector(input, debug=False):
     Returns: A pupil candidate in OpenCV ellipse format.
     """
 
-    _, thresh = cv.threshold(input, 50, 255, cv.THRESH_BINARY_INV)
+    _, thresh = cv.threshold(input, 20, 255, cv.THRESH_BINARY_INV)
     contours, _ = cv.findContours(thresh, cv.RETR_LIST,
                                   cv.CHAIN_APPROX_SIMPLE)
 
@@ -81,16 +81,16 @@ def find_glints(gray, center, *,
 
     gray = cv.bitwise_and(gray, gray, mask=mask)
 
-    min_area = 2
+    min_area = 3
 
     contours = []
-    while True:
+    for i in range(5):
         _, thresh = cv.threshold(gray, threshold, 255, cv.THRESH_BINARY)
         threshold -= 10
         # thresh = cv.adaptiveThreshold(gray, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 21, 25)
 
-        kernel = cv.getStructuringElement(cv.MORPH_CROSS, (3, 3))
-        # thresh = cv.morphologyEx(thresh, cv.MORPH_CLOSE, kernel)
+        kernel = cv.getStructuringElement(cv.MORPH_CROSS, (5, 5))
+        thresh = cv.morphologyEx(thresh, cv.MORPH_OPEN, kernel)
 
         contours, _ = cv.findContours(thresh, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
         print(len(contours))
