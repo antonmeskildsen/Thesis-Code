@@ -13,6 +13,8 @@ from thesis.segmentation import IrisImage
 from thesis.tracking.gaze import GazeModel, BasicGaze
 from thesis.tracking.features import normalize_coordinates
 
+from thesis.tools.st_utils import fit_else_ref, create_deepeye_func
+
 
 @dataclass
 class GazeImage:
@@ -44,7 +46,7 @@ class GazeDataset:
             calibration_samples = list(map(lambda d: GazeImage.from_json(path, d), data['calibration']))
             test_samples = list(map(lambda d: GazeImage.from_json(path, d), data['test']))
 
-            model = BasicGaze()
+            model = BasicGaze(pupil_detector=fit_else_ref)
             images = [s.image for s in calibration_samples]
             gaze_positions = [s.screen_position for s in calibration_samples]
             model.calibrate(images, gaze_positions)

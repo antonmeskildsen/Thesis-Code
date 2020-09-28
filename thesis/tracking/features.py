@@ -8,7 +8,7 @@ def pupil_detector(input, debug=False):
     Returns: A pupil candidate in OpenCV ellipse format.
     """
 
-    _, thresh = cv.threshold(input, 50, 255, cv.THRESH_BINARY_INV)
+    _, thresh = cv.threshold(input, 5, 255, cv.THRESH_BINARY_INV)
     contours, _ = cv.findContours(thresh, cv.RETR_LIST,
                                   cv.CHAIN_APPROX_SIMPLE)
 
