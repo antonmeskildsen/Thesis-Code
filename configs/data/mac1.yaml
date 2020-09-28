@@ -3,3 +3,6 @@ gaze_data:
 
 iris_data:
   - '/Users/Anton/Desktop/data/iris/casia4i_sample.json'
+
+pupil_data:
+  - '/Users/Anton/Desktop/data/pupil/info.json'

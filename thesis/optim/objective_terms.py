@@ -7,8 +7,10 @@ import numpy as np
 from thesis.data import SegmentationSample, GazeImage, PupilSample
 from entropy import gradient_histogram, histogram, entropy
 from thesis.tracking.gaze import GazeModel
-from thesis.tracking.features import normalize_coordinates
+from thesis.tracking.features import normalize_coordinates, pupil_detector
 from thesis.segmentation import IrisCodeEncoder, IrisImage
+
+from pupilfit import fit_else, fit_excuse
 
 
 def bilateral_filter(img, kernel_size, sigma_c, sigma_s):
@@ -51,7 +53,7 @@ class PupilTerm(ABC):
         ...
 
     @abstractmethod
-    def __call__(self, pupil_detector: Callable, sample: PupilSample, filtered: np.ndarray) -> float:
+    def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
         ...
 
 
@@ -118,17 +120,50 @@ class RelativeGazeAccuracy(GazeTerm):
         return dist_b / dist_a
 
 
-class AbsolutePupilDistance(PupilTerm):
-    def __call__(self, pupil_detector: Callable, sample: PupilSample, filtered: np.ndarray) -> float:
-        predicted = pupil_detector(filtered)
-        return np.linalg.norm(np.array(predicted) - np.array(sample.center))
+def _pupil_detector(image):
+    y, x = pupil_detector(image)[:2]
+    return x, y
 
 
-class RelativePupilDistance(PupilTerm):
-    def __call__(self, pupil_detector: Callable, sample: PupilSample, filtered: np.ndarray) -> float:
-        predicted_unmodified = pupil_detector(sample.image)
-        predicted_filtered = pupil_detector(filtered)
-        dist_unmodified = np.linalg.norm(np.array(predicted_unmodified) - np.array(sample.center))
-        dist_filtered = np.linalg.norm(np.array(predicted_filtered) - np.array(sample.center))
+def pupil_distance_absolute(detector: Callable, sample: PupilSample, filtered: np.ndarray) -> float:
+    predicted = detector(filtered)
+    return np.linalg.norm(np.array(predicted) - np.array(sample.center))
 
-        return dist_filtered / dist_unmodified
+
+def pupil_distance_relative(detector: Callable, sample: PupilSample, filtered: np.ndarray) -> float:
+    predicted_unmodified = detector(sample.image)
+    predicted_filtered = detector(filtered)
+    dist_unmodified = np.linalg.norm(np.array(predicted_unmodified) - np.array(sample.center))
+    dist_filtered = np.linalg.norm(np.array(predicted_filtered) - np.array(sample.center))
+
+    return dist_filtered / dist_unmodified
+
+
+class AbsolutePupilDistanceBaseAlgorithm(PupilTerm):
+    def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
+        return pupil_distance_absolute(_pupil_detector, sample, filtered)
+
+
+class RelativePupilDistanceBaseAlgorithm(PupilTerm):
+    def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
+        return pupil_distance_relative(_pupil_detector, sample, filtered)
+
+
+class AbsolutePupilDistanceElse(PupilTerm):
+    def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
+        return pupil_distance_absolute(fit_else, sample, filtered)
+
+
+class RelativePupilDistanceElse(PupilTerm):
+    def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
+        return pupil_distance_relative(fit_else, sample, filtered)
+
+
+class AbsolutePupilDistanceExcuse(PupilTerm):
+    def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
+        return pupil_distance_absolute(fit_excuse, sample, filtered)
+
+
+class RelativePupilDistanceExcuse(PupilTerm):
+    def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
+        return pupil_distance_relative(fit_excuse, sample, filtered)

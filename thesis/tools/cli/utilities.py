@@ -4,7 +4,7 @@ from typing import List
 
 import numpy as np
 import cv2
-from data import GazeDataset, SegmentationDataset
+from data import GazeDataset, SegmentationDataset, PupilDataset
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn import linear_model
 
@@ -105,3 +105,7 @@ def load_gaze_data(datasets: List[str]) -> List[GazeDataset]:
 
 def load_iris_data(datasets: List[str]) -> List[SegmentationDataset]:
     return list(map(SegmentationDataset.from_path, datasets))
+
+
+def load_pupil_data(datasets: List[str]) -> List[PupilDataset]:
+    return list(map(PupilDataset.from_path, datasets))
