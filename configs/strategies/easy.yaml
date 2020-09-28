@@ -34,7 +34,7 @@ gaussian_noise:
       num: 20
 
 
-bfilter:
+bilateral_filter:
   sigma_s:
     type: samples_exp
     params:
@@ -50,7 +50,7 @@ bfilter:
       num: 5
       exp: 10
 
-gfilter:
+gaussian_filter:
   sigma:
     type: samples_exp
     params:

@@ -1,0 +1,5 @@
+gaze_data:
+  - '/home/anton/data/eyedata/gaze/anton02/'
+
+iris_data:
+  - '/home/anton/data/eyedata/iris/casia4i.json'

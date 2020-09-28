@@ -1,4 +1,6 @@
 import os
+import cv2 as cv
+import numpy as np
 
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import PolynomialFeatures
@@ -8,14 +10,33 @@ from scipy import stats
 
 from glob import glob
 
-from thesis.tracking.features import *
+from thesis.tracking.features import find_glints
+from thesis.tracking import features
 from thesis.tracking.gaze import BasicGaze
 from tools.cli.utilities import load_json, load_images
 from thesis.optim.filters import uniform_noise
+from thesis.deepeye import deepeye
+from thesis.tools.st_utils import create_deepeye_func, fit_else_ref
+
+from pupilfit import fit_else, fit_excuse
 
 import matplotlib.pyplot as plt
 
 import streamlit as st
+import tensorflow as tf
+
+tf.reset_default_graph()
+
+
+st.info('Loading Tensorflow model into memory')
+deepeye_ref = create_deepeye_func()
+
+
+
+
+
+
+
 
 st.title('Gaze experiments')
 
@@ -55,6 +76,8 @@ if st.sidebar.checkbox('Bilateral filter'):
     idx = st.number_input('Image', 0, len(images), 0)
     st.image(images[int(idx)], 'Sample')
 
+pupil_detector = st.selectbox('Pupil method', (fit_else_ref, features.pupil_detector, deepeye_ref), format_func=lambda x: x.__name__)
+
 st.sidebar.markdown("# Filter")
 filter_choice = st.sidebar.selectbox('Obfuscation filter', ('uniform noise',))
 if filter_choice == 'uniform noise':
@@ -69,7 +92,7 @@ def show(img, **kwargs):
     rgb_img = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
     cv.drawMarker(rgb_img, (int(pup[1]), int(pup[0])), (0, 50, 255), cv.MARKER_STAR, 40, 2)
     if len(glints) > 0:
-        glints = np.array([gl]) #glints[[0]]
+        glints = np.array([gl])  # glints[[0]]
         glints = sorted(glints, key=lambda g: g[0] + g[1])
         for i, g in enumerate(glints):
             cv.drawMarker(rgb_img, (int(g[1]), int(g[0])), (255 - i * 70, i * 70, 0), cv.MARKER_CROSS, 20, 2)
@@ -101,12 +124,12 @@ with st.spinner('Wait...'):
 
 
 def err(X, y, fov=87):
-    err = model.predict(X) - normalize_coordinates(y, HEIGHT, WIDTH)
+    err = model.predict(X) - features.normalize_coordinates(y, HEIGHT, WIDTH)
     return err * fov
 
 
 def norm_err(X, y, fov=87):
-    diff = model.predict(X) - normalize_coordinates(y, HEIGHT, WIDTH)
+    diff = model.predict(X) - features.normalize_coordinates(y, HEIGHT, WIDTH)
     dist = np.linalg.norm(diff, axis=1)
     return dist * fov
 
@@ -127,7 +150,7 @@ if st.sidebar.checkbox('Calc gaze'):
     test_X = images[n_cal:]
     test_y = gaze_positions[n_cal:]
 
-    model = BasicGaze(dict(threshold=thresh, radius=radius, max_area=area, min_ratio=ratio), model)
+    model = BasicGaze(dict(threshold=thresh, radius=radius, max_area=area, min_ratio=ratio), model, pupil_detector)
     model.calibrate(train_X, train_y)
 
     e = np.abs(err(test_X, test_y)).mean(axis=0)
@@ -157,7 +180,7 @@ if st.sidebar.checkbox('Calc gaze'):
         st.pyplot()
 
     plt.figure()
-    ny = normalize_coordinates(test_y, HEIGHT, WIDTH)
+    ny = features.normalize_coordinates(test_y, HEIGHT, WIDTH)
     plt.scatter(ny[:, 0], ny[:, 1])
 
     pred_y = model.predict(test_X)
@@ -165,7 +188,7 @@ if st.sidebar.checkbox('Calc gaze'):
     st.pyplot()
 
     plt.figure()
-    ny = normalize_coordinates(train_y, HEIGHT, WIDTH)
+    ny = features.normalize_coordinates(train_y, HEIGHT, WIDTH)
     plt.scatter(ny[:, 0], ny[:, 1])
 
     pred_y = model.predict(train_X)
