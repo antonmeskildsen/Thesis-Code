@@ -62,7 +62,7 @@ class IrisImage:
         image = cv.imread(data['image'])
         return IrisImage(segmentation, image)
 
-    def to_polar(self, angular_resolution, linear_resolution, start_angle=0) -> np.ndarray:
+    def to_polar(self, angular_resolution, linear_resolution, start_angle=0) -> (np.ndarray, np.ndarray):
         """Create polar image.
 
         Args:
