@@ -4,6 +4,8 @@ import os
 from collections import defaultdict
 import json
 import numpy as np
+from scipy import stats
+from sklearn.neighbors.kde import KernelDensity
 import cv2 as cv
 from glob2 import glob
 from itertools import product
@@ -11,17 +13,24 @@ from itertools import product
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+import npeet.entropy_estimators as ee
+
+from thesis.optim.filters import gaussian_filter
 from thesis.segmentation import IrisImage, IrisSegmentation, IrisCodeEncoder, IrisCode
 
 "# Explorer"
 
-base = '/home/anton/data/eyedata/iris'
-# base = '/Users/Anton/Desktop/data/iris'
+# base = '/home/anton/data/eyedata/iris'
+base = '/Users/Anton/Desktop/data/iris'
 
 files = glob(os.path.join(base, '*.json'))
 names = [os.path.basename(p).split('.')[0] for p in files]
 
 dataset = st.selectbox('Dataset', names)
+
+st.sidebar.markdown('# Filter setup')
+the_filter = gaussian_filter
+
 
 scales = st.sidebar.slider('Scales', 1, 10, 6)
 angles = st.sidebar.slider('Angles', 1, 20, 6)
@@ -207,3 +216,32 @@ if st.checkbox('Stats'):
                     'inter_distances': list(inter_distances),
                 }
             }, file)
+
+
+"""
+## Entropy estimation
+"""
+if st.checkbox('Entropy estimation'):
+    image_array = []
+    bar = st.progress(0)
+    length = len(data['data'])
+    for i, sample in enumerate(data['data']):
+        bar.progress(i/length)
+        seg = IrisSegmentation.from_dict(sample['points'])
+        img = cv.imread(sample['image'], cv.IMREAD_GRAYSCALE)
+        iris_img = IrisImage(seg, img)
+        # polar, mask = iris_img.to_polar(angular, radial)
+        polar = np.ones((angular, radial))
+        linear = polar.reshape(-1)
+        # ic = encoder.encode(iris_img)
+        image_array.append(linear)
+    bar.progress(100)
+
+    # kde = KernelDensity(kernel='gaussian', bandwidth=1000).fit(image_array)
+    # log_p = kde.score_samples(image_array)
+    # p = np.exp(log_p)
+    # entropy = -np.sum(p*log_p)
+
+    ent = ee.entropy(image_array, k=3, base=2)
+
+    st.write(ent)
