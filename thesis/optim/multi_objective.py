@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Callable
+from typing import List, Callable, Optional
+import random
 
 import numpy as np
 
@@ -36,34 +37,42 @@ class ObfuscationObjective(Objective):
     gaze_terms: List[GazeTerm]
     pupil_terms: List[PupilTerm]
 
+    iris_samples: int
+    gaze_samples: int
+    pupil_samples: int
+
     def metrics(self) -> List[str]:
-        return list(map(lambda x: type(x).__name__, self.iris_terms)) + list(
-            map(lambda x: type(x).__name__, self.gaze_terms))
+        return list(map(lambda x: type(x).__name__, self.iris_terms)) + \
+               list(map(lambda x: type(x).__name__, self.gaze_terms)) + \
+               list(map(lambda x: type(x).__name__, self.pupil_terms))
 
     def eval(self, params):
         iris_results = [[] for _ in range(len(self.iris_terms))]
         gaze_results = [[] for _ in range(len(self.gaze_terms))]
         pupil_results = [[] for _ in range(len(self.pupil_terms))]
 
+        samples_per_set = self.iris_samples // len(self.iris_datasets)
         for dataset in self.iris_datasets:
-            for sample in dataset.samples:
+            for sample in random.sample(dataset.samples, samples_per_set):
                 output = self.filter(sample.image.image, **params)
                 for i, term in enumerate(self.iris_terms):
                     iris_results[i].append(term(sample, output))
 
+        samples_per_set = self.gaze_samples // len(self.gaze_datasets)
         for dataset in self.gaze_datasets:
-            for sample in dataset.test_samples:
+            for sample in random.sample(dataset.test_samples, samples_per_set):
                 output = self.filter(sample.image, **params)
                 for i, term in enumerate(self.gaze_terms):
                     gaze_results[i].append(term(dataset.model, sample, output))
 
+        samples_per_set = self.pupil_samples // len(self.pupil_datasets)
         for dataset in self.pupil_datasets:
-            for sample in dataset.samples:
+            for sample in random.sample(dataset.samples, samples_per_set):
                 output = self.filter(sample.image, **params)
                 for i, term in enumerate(self.pupil_terms):
                     pupil_results[i].append(term(sample, output))
 
-        return list(map(np.mean, iris_results)) + list(map(np.mean, gaze_results))
+        return list(map(np.mean, iris_results)) + list(map(np.mean, gaze_results)) + list(map(np.mean, pupil_results))
 
     def output_dimensions(self):
         return len(self.iris_terms) + len(self.gaze_terms)

@@ -113,6 +113,13 @@ def make_strategy(data, num):
     return parameters, generators
 
 
+iris_samples = st.sidebar.number_input('Iris Samples', 1, min(map(len, iris_data)), 50)
+gaze_samples = st.sidebar.number_input('Gaze Samples', 1, min(map(len, gaze_data)), 50)
+pupil_samples = st.sidebar.number_input('Pupil Samples', 1, min(map(len, pupil_data)), 50)
+
+
+st.sidebar.markdown('### Optimizer parameters')
+
 params = {}
 if method == NaiveMultiObjectiveOptimizer:
     config_file = file_select_sidebar('Strategy file', 'configs/strategies/*.yaml')
@@ -123,7 +130,8 @@ if method == NaiveMultiObjectiveOptimizer:
     sampling = st.sidebar.selectbox('Sampling technique', (GridSearch, UniformSampler), format_func=type_name)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms, pupil_terms)
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms, pupil_terms,
+                                         iris_samples, gaze_samples, pupil_samples)
         sampler: Sampler = sampling(*json_to_strategy(config[f.__name__]))
         projected_iterations += len(sampler)
         optimizers[f.__name__] = method([], objective, sampler)
@@ -146,7 +154,8 @@ elif method == PopulationMultiObjectiveOptimizer:
     projected_iterations = iterations * pop_num * len(filters)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms, pupil_terms)
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms, pupil_terms,
+                                         iris_samples, gaze_samples, pupil_samples)
         init = PopulationInitializer(*make_strategy(config[f.__name__], pop_num))
 
         sigmas = []

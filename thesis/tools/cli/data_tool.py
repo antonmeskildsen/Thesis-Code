@@ -185,20 +185,9 @@ def pupil():
     ...
 
 
-@pupil.command()
-@click.argument('path')
-def create(path):
-    """Create json file for data.
-
-    PATH: Path to base pupil folder.
-    """
-
-    paths = glob(os.path.join(path, '*/data set*.txt'), recursive=True)
-    print('Found the following datasets:')
-    for p in paths:
-        print(f'\t{p}')
-
+def get(paths, limit):
     images = []
+    n = 0
     for file_path in tqdm(paths):
         directory = os.path.splitext(file_path)[0]
         with open(file_path) as positions_file:
@@ -208,8 +197,29 @@ def create(path):
                 image_path = os.path.join(directory, f'{image:010d}.png')
                 images.append({
                     'image': os.path.abspath(image_path),
-                    'position': (x, y)
+                    'position': (x/2, 288 - y/2)
                 })
+                n += 1
+                if 0 < limit < n:
+                    return images
+    return images
+
+
+@pupil.command()
+@click.argument('path')
+@click.option('--limit', type=int, default=0)
+def create(path, limit):
+    """Create json file for data.
+
+    PATH: Path to base pupil folder.
+    """
+
+    paths = glob(os.path.join(path, '**data set*.txt'), recursive=True)
+    print('Found the following datasets:')
+    for p in paths:
+        print(f'\t{p}')
+
+    images = get(paths, limit)
 
     with open(os.path.join(path, 'info.json'), 'w') as output_file:
         json.dump({

@@ -39,6 +39,9 @@ class GazeDataset:
     test_samples: List[GazeImage]
     model: GazeModel
 
+    def __len__(self):
+        return len(self.test_samples)
+
     @staticmethod
     def from_path(path: str):
         with open(os.path.join(path, 'data.json')) as file:
@@ -85,6 +88,9 @@ class SegmentationDataset:
     name: str
     samples: List[SegmentationSample]
 
+    def __len__(self):
+        return len(self.samples)
+
     @staticmethod
     def from_path(path: str) -> SegmentationDataset:
         with open(path) as file:
@@ -101,20 +107,26 @@ class SegmentationDataset:
 
 @dataclass
 class PupilSample:
-    image: np.ndarray
+    image_path: str
     center: (int, int)
+
+    @property
+    def image(self):
+        return cv.imread(self.image_path, cv.IMREAD_GRAYSCALE)
 
     @staticmethod
     def from_json(data: dict) -> PupilSample:
-        image = cv.imread(data['image'], cv.IMREAD_GRAYSCALE)
         screen_position = data['position']
-        return PupilSample(image, screen_position)
+        return PupilSample(data['image'], screen_position)
 
 
 @dataclass
 class PupilDataset:
     name: str
     samples: List[PupilSample]
+
+    def __len__(self):
+        return len(self.samples)
 
     @staticmethod
     def from_path(path: str) -> PupilDataset:
