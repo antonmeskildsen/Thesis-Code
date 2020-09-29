@@ -93,7 +93,7 @@ def find_glints(gray, center, *,
         thresh = cv.morphologyEx(thresh, cv.MORPH_OPEN, kernel)
 
         contours, _ = cv.findContours(thresh, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
-        print(len(contours))
+        # print(len(contours))
         if len(contours) >= 2:
             break
 
