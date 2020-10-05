@@ -5,7 +5,8 @@ import json
 
 import cv2 as cv
 import numpy as np
-from skimage.filters import gabor
+from skimage.filters import gabor, gabor_kernel
+from scipy import ndimage as ndi
 
 from thesis.geometry import Quadratic, Ellipse, Mask, Vec2
 
@@ -151,6 +152,41 @@ class IrisCodeEncoder:
         mask = []
         for k in self.kernels:
             f = cv.filter2D(polar, cv.CV_64F, k)
+            m = np.zeros(f.shape, np.uint8)
+            m[np.abs(f) < self.eps] = 1
+            f = np.sign(f)
+            m[polar_mask == 0] = 1
+            res.extend(f.reshape(-1))
+            mask.extend(m.reshape(-1))
+
+        return IrisCode(np.array(res), np.array(mask))
+
+
+class SKImageIrisCodeEncoder:
+    def __init__(self, angles: int = 3,
+                 angular_resolution=20,
+                 radial_resolution=10,
+                 eps=0.01):
+        self.kernels = []
+        self.angular_resolution = angular_resolution
+        self.radial_resolution = radial_resolution
+        self.eps = eps
+        frequencies = 6
+        freqs = np.logspace(0.05, 1.0, frequencies)/10
+        for theta in range(0, angles):
+            a = theta / angles * np.pi / 2
+            for freq in freqs:
+                kernel = gabor_kernel(freq, a, bandwidth=1)
+                self.kernels.append(kernel)
+
+    def encode(self, image, start_angle=0):
+        polar, polar_mask = image.to_polar(self.angular_resolution, self.radial_resolution, start_angle)
+        polar = cv.equalizeHist(polar)
+        polar = np.float64(polar)
+        res = []
+        mask = []
+        for k in self.kernels:
+            f = ndi.convolve(polar, np.imag(k), mode='wrap')
             m = np.zeros(f.shape, np.uint8)
             m[np.abs(f) < self.eps] = 1
             f = np.sign(f)

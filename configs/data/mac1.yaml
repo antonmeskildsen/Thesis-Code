@@ -1,8 +1,8 @@
 gaze_data:
-  - '/Users/Anton/Desktop/data/caps/cap04/'
+  - '/Users/Anton/Desktop/data/gaze/anton5/'
 
 iris_data:
-  - '/Users/Anton/Desktop/data/iris/casia4i_sample.json'
+  - '/Users/Anton/Desktop/data/iris/casia4i.json'
 
 pupil_data:
   - '/Users/Anton/Desktop/data/pupil/info.json'

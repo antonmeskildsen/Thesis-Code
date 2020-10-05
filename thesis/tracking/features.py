@@ -81,7 +81,7 @@ def find_glints(gray, center, *,
 
     gray = cv.bitwise_and(gray, gray, mask=mask)
 
-    min_area = 3
+    min_area = 1
 
     contours = []
     for i in range(5):
@@ -89,8 +89,8 @@ def find_glints(gray, center, *,
         threshold -= 10
         # thresh = cv.adaptiveThreshold(gray, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 21, 25)
 
-        kernel = cv.getStructuringElement(cv.MORPH_CROSS, (5, 5))
-        thresh = cv.morphologyEx(thresh, cv.MORPH_OPEN, kernel)
+        # kernel = cv.getStructuringElement(cv.MORPH_CROSS, (5, 5))
+        # thresh = cv.morphologyEx(thresh, cv.MORPH_OPEN, kernel)
 
         contours, _ = cv.findContours(thresh, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE)
         # print(len(contours))
@@ -100,7 +100,7 @@ def find_glints(gray, center, *,
     contours = list(filter(lambda cn: min_area < cv.contourArea(cn) < max_area, contours))
     contours = list(filter(lambda cn: ratio(cn) > min_ratio, contours))
     chosen = np.array([contour_center(c) for c in contours])
-    chosen = sorted(chosen, key=lambda cn: dist(cn, c))[:2]
+    chosen = sorted(chosen, key=lambda cn: dist(cn, c))[:1]
     # centers = np.array([contour_center(c) for c in contours])
 
     # centers = np.array(list(filter(lambda cn: dist(cn, c) < 100, centers)))[:4]
