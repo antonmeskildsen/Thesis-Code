@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 
 from thesis.entropy import gradient_histogram, histogram, entropy
 from thesis.segmentation import IrisSegmentation, IrisImage, IrisCodeEncoder
-from thesis.entropy import dx, dy
+from thesis.entropy import dx, dy, joint_gradient_histogram
 
 """
 # Entropy Test Lab
@@ -131,48 +131,49 @@ for y in range(256 // div):
             r = v * t
             mutual_information += r
 
-joint_grad = np.zeros((512 // div, 512 // div, 512 // div, 512 // div))
-img_grad = np.zeros((512 // div, 512 // div))
-fil_grad = np.zeros((512 // div, 512 // div))
-img_dx = dx(pimg)
-img_dx = np.int32(img_dx / img_dx.max() * (256 // div))
-img_dy = dy(img)
-img_dy = np.int32(img_dy / img_dy.max() * (256 // div))
-fil_dx = dx(pfiltered)
-fil_dx = np.int32(fil_dx / fil_dx.max() * (256 // div))
-fil_dy = dy(filtered)
-fil_dy = np.int32(fil_dy / fil_dy.max() * (256 // div))
+# joint_grad = np.zeros((512 // div, 512 // div, 512 // div, 512 // div))
+# img_grad = np.zeros((512 // div, 512 // div))
+# fil_grad = np.zeros((512 // div, 512 // div))
+# img_dx = dx(pimg)
+# img_dx = np.int32(img_dx / img_dx.max() * (256 // div))
+# img_dy = dy(img)
+# img_dy = np.int32(img_dy / img_dy.max() * (256 // div))
+# fil_dx = dx(pfiltered)
+# fil_dx = np.int32(fil_dx / fil_dx.max() * (256 // div))
+# fil_dy = dy(filtered)
+# fil_dy = np.int32(fil_dy / fil_dy.max() * (256 // div))
+#
+# offset = 256 // div - 1
+#
+# height, width = pimg.shape
+# for y in range(height):
+#     for x in range(width):
+#         joint_grad[
+#             img_dy[y, x] + offset,
+#             img_dx[y, x] + offset,
+#             fil_dy[y, x] + offset,
+#             fil_dx[y, x] + offset] += 1
+#         img_grad[img_dy[y, x] + offset, img_dx[y, x] + offset] += 1
+#         fil_grad[fil_dy[y, x] + offset, fil_dx[y, x] + offset] += 1
+#
+# joint_grad /= joint_grad.sum()
+# img_grad /= img_grad.sum()
+# fil_grad /= fil_grad.sum()
 
-offset = 256 // div - 1
+img_grad, fil_grad, joint_grad = joint_gradient_histogram(pimg, pfiltered)
 
-height, width = pimg.shape
-for y in range(height):
-    for x in range(width):
-        joint_grad[
-            img_dy[y, x] + offset,
-            img_dx[y, x] + offset,
-            fil_dy[y, x] + offset,
-            fil_dx[y, x] + offset] += 1
-        img_grad[img_dy[y, x] + offset, img_dx[y, x] + offset] += 1
-        fil_grad[fil_dy[y, x] + offset, fil_dx[y, x] + offset] += 1
-
-joint_grad /= joint_grad.sum()
-img_grad /= img_grad.sum()
-fil_grad /= fil_grad.sum()
-
+st.write(len(joint_grad))
 m2 = 0
-for a in range(512 // div):
-    for b in range(512 // div):
-        for c in range(512 // div):
-            for d in range(512 // div):
-                v = joint_grad[a, b, c, d]
-                base_v = img_grad[a, b]
-                filt_v = fil_grad[c, d]
-                if v > 0 and base_v > 0 and filt_v > 0:
-                    d = base_v * filt_v
-                    t = np.log2(v / d)
-                    r = v * t
-                    m2 += r
+
+for (a, b, c, d), v in joint_grad.items():
+    base_v = img_grad[a, b]
+    filt_v = fil_grad[c, d]
+    if v > 0 and base_v > 0 and filt_v > 0:
+        d = base_v * filt_v
+        t = np.log2(v / d)
+        r = v * t
+        m2 += r
+
 
 f'Gradient mutual: {m2}'
 

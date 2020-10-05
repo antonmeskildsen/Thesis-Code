@@ -132,7 +132,7 @@ if method == NaiveMultiObjectiveOptimizer:
     config_file = file_select_sidebar('Strategy file', 'configs/strategies/*.yaml')
     with open(config_file) as config_file:
         config = yaml.safe_load(config_file)
-    st.write(config)
+    # st.write(config)
     params['configuration'] = config
     sampling = st.sidebar.selectbox('Sampling technique', (GridSearch, UniformSampler), format_func=type_name)
 

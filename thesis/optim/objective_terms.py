@@ -126,7 +126,7 @@ def _pupil_detector(image):
 
 
 def pupil_distance_absolute(detector: Callable, sample: PupilSample, filtered: np.ndarray) -> float:
-    predicted = detector(filtered)[0]
+    predicted = detector(filtered)
     return np.linalg.norm(np.array(predicted) - np.array(sample.center))
 
 
