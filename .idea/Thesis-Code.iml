@@ -8,7 +8,7 @@
       <excludeFolder url="file://$MODULE_DIR$/tests/.hypothesis" />
       <excludeFolder url="file://$MODULE_DIR$/thesis.egg-info" />
     </content>
-    <orderEntry type="jdk" jdkName="Python 3.7 (iaml)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Python 3.7 (tf1)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">

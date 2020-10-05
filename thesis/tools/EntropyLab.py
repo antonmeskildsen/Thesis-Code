@@ -13,14 +13,14 @@ import matplotlib.pyplot as plt
 
 from thesis.entropy import gradient_histogram, histogram, entropy
 from thesis.segmentation import IrisSegmentation, IrisImage, IrisCodeEncoder
-from thesis.entropy import dx, dy, joint_gradient_histogram
+from thesis.entropy import dx, dy, joint_gradient_histogram, gradient_histogram, entropy, mutual_information, joint_histogram
 
 """
 # Entropy Test Lab
 """
 
-# base = '/home/anton/data/eyedata/iris'
-base = '/Users/Anton/Desktop/data/iris'
+base = '/home/anton/data/eyedata/iris'
+# base = '/Users/Anton/Desktop/data/iris'
 
 files = glob(os.path.join(base, '*.json'))
 names = [os.path.basename(p).split('.')[0] for p in files]
@@ -45,8 +45,8 @@ seg = IrisSegmentation.from_dict(sample['points'])
 img = cv.imread(sample['image'], cv.IMREAD_GRAYSCALE)
 ints = 100
 filtered = img.copy()
-filtered = np.uint8(np.clip(img + np.random.uniform(-ints // 2, ints // 2, img.shape), 0, 255))
 # filtered = np.uint8(np.clip(img + np.random.uniform(-ints // 2, ints // 2, img.shape), 0, 255))
+# filtered = np.uint8(np.random.uniform(0, 255, img.shape))
 
 tmp_img = IrisImage(seg, img)
 # num = 5000
@@ -60,7 +60,7 @@ tmp_img = IrisImage(seg, img)
 # for x in range(0, filtered.shape[1] // s, 2):
 #     filtered[:, x * s:(x + 1) * s] += 35
 # filtered = np.uint8(np.clip(filtered, 0, 255))
-filtered = cv.GaussianBlur(filtered, (0, 0), 0.5)
+filtered = cv.GaussianBlur(filtered, (0, 0), 5)
 # filtered = cv.medianBlur(img, 55)
 # filtered = cv.bilateralFilter(img, 0, 50, 80)
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
@@ -97,7 +97,7 @@ f'Hamming Distance: {d}'
 st.image([base_code.masked_image().reshape((30, -1)), filtered_code.masked_image().reshape((30, -1))])
 
 bins = 50
-div = 16
+div = 64
 # hist_base = np.histogram(img, div, normed=True)[0].reshape((1, -1))
 # hist_filt = np.histogram(filtered, div, normed=True)[0].reshape((1, -1))
 hist_base = np.zeros((256 // div))
@@ -115,72 +115,56 @@ joint /= joint.sum()
 hist_base /= hist_base.sum()
 hist_filt /= hist_filt.sum()
 
-fig, ax = plt.subplots()
-sns.heatmap(joint, ax=ax)
+hist_base, hist_filt, joint = joint_histogram(pimg, pfiltered, 32)
+
+# fig, ax = plt.subplots()
+# sns.heatmap(joint, ax=ax)
+# st.pyplot(fig)
+
+mi = mutual_information(hist_base, hist_filt, joint)
+
+div = 128
+
+
+img_grad, fil_grad, joint_grad = joint_gradient_histogram(pimg, pfiltered, divisions=8)
+
+fig, ax = plt.subplots(2, 1)
+sns.heatmap(img_grad, ax=ax[0])
+sns.heatmap(fil_grad, ax=ax[1])
 st.pyplot(fig)
 
-mutual_information = 0
-for y in range(256 // div):
-    for x in range(256 // div):
-        v = joint[y, x]
-        base_v = hist_base[x]
-        filt_v = hist_filt[x]
-        d = base_v * filt_v
-        if v > 0 and base_v > 0 and filt_v > 0:
-            t = np.log2(v / d)
-            r = v * t
-            mutual_information += r
+e = entropy(img_grad)
+f'Gradient entropy of original: {e}'
 
-# joint_grad = np.zeros((512 // div, 512 // div, 512 // div, 512 // div))
-# img_grad = np.zeros((512 // div, 512 // div))
-# fil_grad = np.zeros((512 // div, 512 // div))
-# img_dx = dx(pimg)
-# img_dx = np.int32(img_dx / img_dx.max() * (256 // div))
-# img_dy = dy(img)
-# img_dy = np.int32(img_dy / img_dy.max() * (256 // div))
-# fil_dx = dx(pfiltered)
-# fil_dx = np.int32(fil_dx / fil_dx.max() * (256 // div))
-# fil_dy = dy(filtered)
-# fil_dy = np.int32(fil_dy / fil_dy.max() * (256 // div))
-#
-# offset = 256 // div - 1
-#
-# height, width = pimg.shape
-# for y in range(height):
-#     for x in range(width):
-#         joint_grad[
-#             img_dy[y, x] + offset,
-#             img_dx[y, x] + offset,
-#             fil_dy[y, x] + offset,
-#             fil_dx[y, x] + offset] += 1
-#         img_grad[img_dy[y, x] + offset, img_dx[y, x] + offset] += 1
-#         fil_grad[fil_dy[y, x] + offset, fil_dx[y, x] + offset] += 1
-#
-# joint_grad /= joint_grad.sum()
-# img_grad /= img_grad.sum()
-# fil_grad /= fil_grad.sum()
+m2 = mutual_information(img_grad, fil_grad, joint_grad)
 
-img_grad, fil_grad, joint_grad = joint_gradient_histogram(pimg, pfiltered)
-
-st.write(len(joint_grad))
-m2 = 0
-
-for (a, b, c, d), v in joint_grad.items():
-    base_v = img_grad[a, b]
-    filt_v = fil_grad[c, d]
-    if v > 0 and base_v > 0 and filt_v > 0:
-        d = base_v * filt_v
-        t = np.log2(v / d)
-        r = v * t
-        m2 += r
+# for a in range(512 // div):
+#     for b in range(512 // div):
+#         for c in range(512 // div):
+#             for d in range(512 // div):
+#                 v = joint_grad[a, b, c, d]
+#                 base_v = img_grad[a, b]
+#                 filt_v = fil_grad[c, d]
+#                 if v > 0 and base_v > 0 and filt_v > 0:
+#                     d = base_v * filt_v
+#                     t = np.log2(v / d)
+#                     r = v * t
+#                     m2 += r
 
 
 f'Gradient mutual: {m2}'
 
+
+f'Ratio: {(e-m2)/e * 100:.2f} %'
+
 joint = hist_base.T.dot(hist_filt)
 joint /= joint.max()
 
-f'Intensity: {mutual_information}'
+ei = entropy(hist_base)
+f'Intensity original: {ei}'
+f'Intensity: {mi}'
+f'Ratio: {(ei-mi)/ei * 100:.2f}%'
+
 
 pimg = cv.resize(pimg, (0, 0), fx=4, fy=4)
 pfiltered = cv.resize(pfiltered, (0, 0), fx=4, fy=4)

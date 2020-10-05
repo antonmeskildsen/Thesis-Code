@@ -28,26 +28,25 @@ def gradient_histogram(img, mask=None):
     return hist
 
 
-def joint_gradient_histogram(img_a, img_b, divisions=32):
-    div = 512//divisions
-
+def joint_gradient_histogram(img_a, img_b, divisions=4):
     img_a = cv.equalizeHist(img_a)
     img_b = cv.equalizeHist(img_b)
+
     xm_a = dx(img_a)
     ym_a = dy(img_a)
     xm_b = dx(img_b)
     ym_b = dy(img_b)
-    xm_a = np.int32(xm_a / xm_a.max() * (256 // div))
-    ym_a = np.int32(ym_a / ym_a.max() * (256 // div))
-    xm_b = np.int32(xm_b / xm_b.max() * (256 // div))
-    ym_b = np.int32(ym_b / ym_b.max() * (256 // div))
+    xm_a = np.int32(xm_a / xm_a.max() * (divisions // 2))
+    ym_a = np.int32(ym_a / ym_a.max() * (divisions // 2))
+    xm_b = np.int32(xm_b / xm_b.max() * (divisions // 2))
+    ym_b = np.int32(ym_b / ym_b.max() * (divisions // 2))
 
-    hist_a = np.zeros((512 // div, 512 // div))
-    hist_b = np.zeros((512 // div, 512 // div))
+    hist_a = np.zeros((divisions, divisions))
+    hist_b = np.zeros((divisions, divisions))
 
-    hist_joint = defaultdict(lambda: 0)
+    hist_joint = defaultdict(lambda: np.double(0))
 
-    offset = 256 // div - 1
+    offset = (divisions // 2) - 1
     height, width = img_a.shape
     for y in range(height):
         for x in range(width):
@@ -58,22 +57,58 @@ def joint_gradient_histogram(img_a, img_b, divisions=32):
             hist_a[ym_a[y, x] + offset, xm_a[y, x] + offset] += 1
             hist_b[ym_b[y, x] + offset, xm_b[y, x] + offset] += 1
 
-    joint_sum = sum(hist_joint.values())
-    hist_joint = {k: v / joint_sum for k, v in hist_joint.items()}
+    joint_sum = height * width
+    assert height * width == sum(hist_joint.values())
+    hist_joint = defaultdict(float, {k: v / joint_sum for k, v in hist_joint.items()})
     hist_a /= hist_a.sum()
     hist_b /= hist_b.sum()
 
     return hist_a, hist_b, hist_joint
 
 
-def joint_histogram(img_a, img_b, divisions=32):
-    div = 512//divisions
+def mutual_information(hist_a, hist_b, hist_joint):
+    e = 0
+    n = len(next(iter(hist_joint))) // 2
+    for pos, v in hist_joint.items():
+        pos_left = pos[:n]
+        pos_right = pos[n:]
+        base_v = hist_a[pos_left]
+        filt_v = hist_b[pos_right]
+        if base_v > 0 and filt_v > 0:
+            d = base_v * filt_v
+            t = np.log2(v / d)
+            r = v * t
+            e += r
+    return e
 
+
+def joint_histogram(img_a, img_b, divisions=32):
     img_a = cv.equalizeHist(img_a)
     img_b = cv.equalizeHist(img_b)
+    img_a = np.int32(img_a / img_a.max() * (divisions // 2))
+    img_b = np.int32(img_b / img_b.max() * (divisions // 2))
 
-    hist_a = np.zeros((512 // div, 512 // div))
-    hist_b = np.zeros((512 // div, 512 // div))
+    hist_a = np.zeros((divisions))
+    hist_b = np.zeros((divisions))
+
+    hist_joint = defaultdict(float)
+
+    offset = (divisions // 2) - 1
+    height, width = img_a.shape
+    for y in range(height):
+        for x in range(width):
+            hist_joint[(img_a[y, x] + offset,
+                        img_b[y, x] + offset)] += 1
+            hist_a[img_a[y, x]] += 1
+            hist_b[img_b[y, x]] += 1
+
+    joint_sum = height * width
+    assert height * width == sum(hist_joint.values())
+    hist_joint = defaultdict(float, {k: v / joint_sum for k, v in hist_joint.items()})
+    hist_a /= hist_a.sum()
+    hist_b /= hist_b.sum()
+
+    return hist_a, hist_b, hist_joint
 
 
 def entropy(hist):
