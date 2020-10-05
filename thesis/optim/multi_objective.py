@@ -6,6 +6,7 @@ import random
 import numpy as np
 
 from thesis.data import SegmentationDataset, GazeDataset, PupilDataset
+from thesis.optim.pareto import dominates
 from thesis.optim.sampling import Sampler, PopulationInitializer
 from thesis.optim.objective_terms import GazeTerm, SegmentationTerm, PupilTerm
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
@@ -97,12 +98,6 @@ class MultiObjectiveOptimizer:
                         self.results if km == k]):
                 pareto.append(i)
         return pareto
-
-
-def dominates(y, y_mark):
-    y = np.array(y)
-    y_mark = np.array(y_mark)
-    return np.all(y <= y_mark) and np.any(y < y_mark)
 
 
 @dataclass

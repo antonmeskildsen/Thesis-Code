@@ -7,6 +7,7 @@ import pandas as pd
 import altair as alt
 
 from tools.st_utils import file_select
+from thesis.optim.pareto import pareto_frontier
 
 st.title("Obfuscation result analysis")
 """
@@ -24,6 +25,8 @@ st.sidebar.write("# Display settings")
 x = st.sidebar.selectbox('X-axis', frame.columns, index=0)
 y = st.sidebar.selectbox('Y-axis', frame.columns, index=1)
 
+do_pareto = st.sidebar.checkbox('Enable pareto')
+
 if results['optimizer']['method'] == 'PopulationMultiObjectiveOptimizer':
     k = st.sidebar.number_input('Choose iteration', 0, max(frame['k']), 0)
 else:
@@ -36,11 +39,13 @@ c = alt.Chart(frame[frame['k'] == k]).mark_point().encode(
     color='filter'
 ).interactive()
 
-c = c + alt.Chart(frame[frame['k'] == k]).mark_line().encode(
-    x=x,
-    y=y,
-    color='filter'
-).transform_filter(alt.datum.pareto).interactive()
+if do_pareto:
+    pareto_frontier(frame, [x, y])
+    c = c + alt.Chart(frame[frame['k'] == k]).mark_line().encode(
+        x=x,
+        y=y,
+        color='filter'
+    ).transform_filter(alt.datum.pf).interactive()
 st.altair_chart(c, use_container_width=True)
 
 '## Performance analysis'
@@ -54,9 +59,10 @@ c = alt.Chart(filtered[frame['k'] == k]).mark_point().encode(
     color='filter'
 ).interactive()
 
-c = c + alt.Chart(filtered[frame['k'] == k]).mark_line().encode(
-    x=x,
-    y=y,
-    color='filter'
-).transform_filter(alt.datum.pareto).interactive()
+if do_pareto:
+    c = c + alt.Chart(filtered[frame['k'] == k]).mark_line().encode(
+        x=x,
+        y=y,
+        color='filter'
+    ).transform_filter(alt.datum.pareto).interactive()
 st.altair_chart(c, use_container_width=True)

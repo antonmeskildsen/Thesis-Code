@@ -214,7 +214,7 @@ def create(path, limit):
     PATH: Path to base pupil folder.
     """
 
-    paths = glob(os.path.join(path, '**data set*.txt'), recursive=True)
+    paths = glob(os.path.join(path, '**/data set*.txt'), recursive=True)
     print('Found the following datasets:')
     for p in paths:
         print(f'\t{p}')
