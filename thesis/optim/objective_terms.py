@@ -139,6 +139,14 @@ def pupil_distance_relative(detector: Callable, sample: PupilSample, filtered: n
     return dist_filtered / dist_unmodified
 
 
+def fit_else_center(image: np.ndarray) -> (float, float):
+    return fit_else(image)[0]
+
+
+def fit_excuse_center(image: np.ndarray) -> (float, float):
+    return fit_excuse(image)[0]
+
+
 class AbsolutePupilDistanceBaseAlgorithm(PupilTerm):
     def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
         return pupil_distance_absolute(_pupil_detector, sample, filtered)
@@ -151,19 +159,19 @@ class RelativePupilDistanceBaseAlgorithm(PupilTerm):
 
 class AbsolutePupilDistanceElse(PupilTerm):
     def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
-        return pupil_distance_absolute(fit_else, sample, filtered)
+        return pupil_distance_absolute(fit_else_center, sample, filtered)
 
 
 class RelativePupilDistanceElse(PupilTerm):
     def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
-        return pupil_distance_relative(fit_else, sample, filtered)
+        return pupil_distance_relative(fit_else_center, sample, filtered)
 
 
 class AbsolutePupilDistanceExcuse(PupilTerm):
     def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
-        return pupil_distance_absolute(fit_excuse, sample, filtered)
+        return pupil_distance_absolute(fit_excuse_center, sample, filtered)
 
 
 class RelativePupilDistanceExcuse(PupilTerm):
     def __call__(self, sample: PupilSample, filtered: np.ndarray) -> float:
-        return pupil_distance_relative(fit_excuse, sample, filtered)
+        return pupil_distance_relative(fit_excuse_center, sample, filtered)

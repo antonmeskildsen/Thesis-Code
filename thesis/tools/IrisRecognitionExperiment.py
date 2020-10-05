@@ -4,6 +4,7 @@ import os
 from collections import defaultdict
 import json
 import numpy as np
+import random
 from scipy import stats
 from sklearn.neighbors.kde import KernelDensity
 import cv2 as cv
@@ -16,7 +17,7 @@ import matplotlib.pyplot as plt
 import npeet.entropy_estimators as ee
 
 from thesis.optim.filters import gaussian_filter
-from thesis.segmentation import IrisImage, IrisSegmentation, IrisCodeEncoder, IrisCode
+from thesis.segmentation import IrisImage, IrisSegmentation, IrisCodeEncoder, IrisCode, SKImageIrisCodeEncoder
 
 "# Explorer"
 
@@ -31,7 +32,6 @@ dataset = st.selectbox('Dataset', names)
 st.sidebar.markdown('# Filter setup')
 the_filter = gaussian_filter
 
-
 scales = st.sidebar.slider('Scales', 1, 10, 6)
 angles = st.sidebar.slider('Angles', 1, 20, 6)
 wavelength = st.sidebar.number_input('Wavelength Base', 0.0, 10.0, 0.5)
@@ -44,7 +44,8 @@ spacing = st.sidebar.number_input('Angular spacing', 0, 20, 5)
 
 eps = st.sidebar.number_input('Epsilon', 0.0, 20.0, 0.01)
 
-encoder = IrisCodeEncoder(scales, angles, angular, radial, wavelength, mult, eps)
+# encoder = IrisCodeEncoder(scales, angles, angular, radial, wavelength, mult, eps)
+encoder = SKImageIrisCodeEncoder(angles, angular, radial, eps)
 
 
 def get_code(img, info):
@@ -71,9 +72,9 @@ def create_code(item, angles=1, angular_spacing=5):
     seg = IrisSegmentation.from_dict(item['points'])
     img = cv.imread(item['image'], cv.IMREAD_GRAYSCALE)
     iris_img = IrisImage(seg, img)
-    ic = encoder.encode(iris_img)
     if angles == 1:
-        return ic
+        ic = encoder.encode(iris_img)
+        return [ic]
     else:
         angular_spacing_radians = angular_spacing / 360 * 2 * np.pi
         codes = []
@@ -126,6 +127,7 @@ if st.checkbox('Compare'):
     info2 = data['data'][index2]
     img = cv.imread(info['image'], cv.IMREAD_GRAYSCALE)
     img2 = cv.imread(info2['image'], cv.IMREAD_GRAYSCALE)
+    # img2 = np.uint8(np.random.uniform(0, 255, img2.shape))
 
     if img is None or img2 is None:
         raise IOError("Could not open image")
@@ -134,13 +136,13 @@ if st.checkbox('Compare'):
     c2 = get_code(img2, info2['points'])
 
     c2s = create_code(info2, angle_tests, spacing)
-    for c in c2s:
-        height = 30
-        while height < len(c.code) and len(c.code) % height != 0:
-            height += 1
-        code = c.masked_image()
-        code = np.array(code).reshape((height, -1))
-        # st.image([code], 'code')
+    # for c in c2s:
+    #     height = 30
+    #     while height < len(c.code) and len(c.code) % height != 0:
+    #         height += 1
+    #     code = c.masked_image()
+    #     code = np.array(code).reshape((height, -1))
+    # st.image([code], 'code')
     f'Best: {min(map(c1.dist, c2s))}'
     # c2 = IrisCode(np.random.choice([-1, 1], c1.code.size))
     # n = ((c1 * c2) == 0).sum()
@@ -163,17 +165,23 @@ if st.checkbox('Stats'):
     n = len(codes)
     distance_matrix = np.zeros((n, n))
     same_mask = np.zeros((n, n), np.bool)
+    num_samples = 0
     for i in range(n):
         bar.progress(i / n)
         for j in range(n):
-            distance_matrix[i, j] = min([codes[i][angle_tests//2].dist(cb) for cb in codes[j]])
             # distance_matrix[i, j] = min([ca.dist(cb) for ca, cb in product(codes[i], codes[j])])
             # distance_matrix[i, j] = codes[i].dist(codes[j])
             in_data = data['data']
             info_i = in_data[i]['info']
             info_j = in_data[j]['info']
+            same = False
             if info_i['user_id'] == info_j['user_id'] and info_i['eye'] == info_j['eye']:
+                same = True
                 same_mask[i, j] = True
+
+            if same or random.random() < 0.01:  # Rate
+                num_samples += 1
+                distance_matrix[i, j] = min([codes[i][angle_tests // 2].dist(cb) for cb in codes[j]])
     bar.progress(1.0)
     # st.write(same_mask)
     # st.write(distance_matrix)
@@ -217,7 +225,6 @@ if st.checkbox('Stats'):
                 }
             }, file)
 
-
 """
 ## Entropy estimation
 """
@@ -226,7 +233,7 @@ if st.checkbox('Entropy estimation'):
     bar = st.progress(0)
     length = len(data['data'])
     for i, sample in enumerate(data['data']):
-        bar.progress(i/length)
+        bar.progress(i / length)
         seg = IrisSegmentation.from_dict(sample['points'])
         img = cv.imread(sample['image'], cv.IMREAD_GRAYSCALE)
         iris_img = IrisImage(seg, img)

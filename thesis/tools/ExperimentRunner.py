@@ -1,3 +1,4 @@
+import copy
 from typing import Dict
 
 import streamlit as st
@@ -12,6 +13,7 @@ import numpy as np
 import pandas as pd
 import altair as alt
 
+from data import GazeDataset, PupilDataset, SegmentationDataset
 from optim.multi_objective import MultiObjectiveOptimizer, NaiveMultiObjectiveOptimizer, \
     PopulationMultiObjectiveOptimizer, ObfuscationObjective
 
@@ -46,13 +48,18 @@ with open(config_file) as config_file:
     config = yaml.safe_load(config_file)
 
 
-@st.cache
+@st.cache(hash_funcs={
+    GazeDataset: lambda _: None,
+    PupilDataset: lambda _: None,
+    SegmentationDataset: lambda _: None
+}, allow_output_mutation=True)
 def load_data():
     return load_gaze_data(config['gaze_data']), load_iris_data(config['iris_data']), \
            load_pupil_data(config['pupil_data'])
 
 
-gaze_data, iris_data, pupil_data = load_data()
+loaded = copy.deepcopy(load_data())
+gaze_data, iris_data, pupil_data = loaded
 
 '**Gaze data:**'
 f = [(g.name, len(g.test_samples), len(g.calibration_samples)) for g in gaze_data]

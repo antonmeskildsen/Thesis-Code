@@ -27,22 +27,15 @@ import tensorflow as tf
 
 tf.reset_default_graph()
 
-
 st.info('Loading Tensorflow model into memory')
-deepeye_ref = create_deepeye_func()
-
-
-
-
-
-
+# deepeye_ref = create_deepeye_func()
 
 
 st.title('Gaze experiments')
 
 # path = '/home/anton/data/cap04'
-# sets = glob(os.path.join('/Users/Anton/Desktop/data/caps/', '*/'))
-sets = glob(os.path.join('/home/anton/data/eyedata/gaze', '**/'), recursive=True)
+sets = glob(os.path.join('/Users/Anton/Desktop/data/gaze/', '**/'), recursive=True)
+# sets = glob(os.path.join('/home/anton/data/eyedata/gaze', '**/'), recursive=True)
 path = st.selectbox('Dataset', sets)
 
 gaze_positions = load_json(path, 'positions')
@@ -52,6 +45,7 @@ HEIGHT = 2160
 
 images = load_images(path)
 images = [cv.cvtColor(img, cv.COLOR_BGR2GRAY) for img in images]
+images = [img[50:-50, 50:-50] for img in images]
 
 camera_matrix = np.load('thesis/tools/cam/cameraMatrix.npy')
 dist_coeffs = np.load('thesis/tools/cam/distCoeffs.npy')
@@ -76,7 +70,8 @@ if st.sidebar.checkbox('Bilateral filter'):
     idx = st.number_input('Image', 0, len(images), 0)
     st.image(images[int(idx)], 'Sample')
 
-pupil_detector = st.selectbox('Pupil method', (fit_else_ref, features.pupil_detector, deepeye_ref), format_func=lambda x: x.__name__)
+pupil_detector = st.selectbox('Pupil method', (fit_else_ref, features.pupil_detector),
+                              format_func=lambda x: x.__name__)
 
 st.sidebar.markdown("# Filter")
 filter_choice = st.sidebar.selectbox('Obfuscation filter', ('uniform noise',))
@@ -109,7 +104,7 @@ def show(img, **kwargs):
 # Glint detection options
 """
 
-img = st.number_input('img', 0, 50, 5)
+img = st.number_input('img', 0, 1000, 5)
 thresh = st.slider('threshold', 0, 255, 184)
 radius = st.slider('radius', 0, 500, 80)
 area = st.slider('min_area', 0, 50, 20)
@@ -152,6 +147,12 @@ if st.sidebar.checkbox('Calc gaze'):
 
     model = BasicGaze(dict(threshold=thresh, radius=radius, max_area=area, min_ratio=ratio), model, pupil_detector)
     model.calibrate(train_X, train_y)
+
+    st.sidebar.markdown('# Field of view calc')
+    screen_dist = st.sidebar.number_input('Distance to screen (cm)', 1, 1000, 60)
+    screen_width = st.sidebar.number_input('Screen width (cm)', 1, 1000, 40)
+    fov = np.arcsin(screen_width/(2*screen_dist))*2 / (2*np.pi) * 360
+    st.sidebar.markdown(f'FOV: {fov}')
 
     e = np.abs(err(test_X, test_y)).mean(axis=0)
     st.write(e)

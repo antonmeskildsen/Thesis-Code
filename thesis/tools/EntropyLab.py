@@ -44,22 +44,28 @@ sample = data['data'][index]
 seg = IrisSegmentation.from_dict(sample['points'])
 img = cv.imread(sample['image'], cv.IMREAD_GRAYSCALE)
 ints = 100
-filtered = img
-# filtered = np.uint8(np.clip(img + np.random.uniform(-ints // 2, ints // 2, img.shape), 0, 255))
+filtered = img.copy()
+filtered = np.uint8(np.clip(img + np.random.uniform(-ints // 2, ints // 2, img.shape), 0, 255))
 # filtered = np.uint8(np.clip(img + np.random.uniform(-ints // 2, ints // 2, img.shape), 0, 255))
 
+tmp_img = IrisImage(seg, img)
 # num = 5000
 # coords = np.random.randint(0, filtered.size, num)
 # height, width = filtered.shape
 # filtered[coords // width, coords % width] = 255
-
-# filtered = cv.GaussianBlur(img, (0, 0), 10)
+# ints = 100
+# s = 30
+# filtered[tmp_img.mask == 1] += np.uint8(np.random.uniform(-ints // 2, ints//2, filtered[tmp_img.mask == 1].shape))
+# filtered = np.int32(filtered)
+# for x in range(0, filtered.shape[1] // s, 2):
+#     filtered[:, x * s:(x + 1) * s] += 35
+# filtered = np.uint8(np.clip(filtered, 0, 255))
+filtered = cv.GaussianBlur(filtered, (0, 0), 0.5)
 # filtered = cv.medianBlur(img, 55)
 # filtered = cv.bilateralFilter(img, 0, 50, 80)
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
 
 st.image([img, filtered])
-
 
 scales = st.sidebar.slider('Scales', 1, 10, 6)
 angles = st.sidebar.slider('Angles', 1, 20, 6)
@@ -139,39 +145,39 @@ fil_dy = np.int32(fil_dy / fil_dy.max() * (256 // div))
 
 offset = 256 // div - 1
 
-# height, width = pimg.shape
-# for y in range(height):
-#     for x in range(width):
-#         joint_grad[
-#             img_dy[y, x] + offset,
-#             img_dx[y, x] + offset,
-#             fil_dy[y, x] + offset,
-#             fil_dx[y, x] + offset] += 1
-#         img_grad[img_dy[y, x] + offset, img_dx[y, x] + offset] += 1
-#         fil_grad[fil_dy[y, x] + offset, fil_dx[y, x] + offset] += 1
-#
-# joint_grad /= joint_grad.sum()
-# img_grad /= img_grad.sum()
-# fil_grad /= fil_grad.sum()
-#
-# m2 = 0
-# for a in range(512 // div):
-#     for b in range(512 // div):
-#         for c in range(512 // div):
-#             for d in range(512 // div):
-#                 v = joint_grad[a, b, c, d]
-#                 base_v = img_grad[a, b]
-#                 filt_v = fil_grad[c, d]
-#                 if v > 0 and base_v > 0 and filt_v > 0:
-#                     d = base_v * filt_v
-#                     t = np.log2(v / d)
-#                     r = v * t
-#                     m2 += r
-#
-# f'Gradient mutual: {m2}'
+height, width = pimg.shape
+for y in range(height):
+    for x in range(width):
+        joint_grad[
+            img_dy[y, x] + offset,
+            img_dx[y, x] + offset,
+            fil_dy[y, x] + offset,
+            fil_dx[y, x] + offset] += 1
+        img_grad[img_dy[y, x] + offset, img_dx[y, x] + offset] += 1
+        fil_grad[fil_dy[y, x] + offset, fil_dx[y, x] + offset] += 1
 
-# joint = hist_base.T.dot(hist_filt)
-# joint /= joint.max()
+joint_grad /= joint_grad.sum()
+img_grad /= img_grad.sum()
+fil_grad /= fil_grad.sum()
+
+m2 = 0
+for a in range(512 // div):
+    for b in range(512 // div):
+        for c in range(512 // div):
+            for d in range(512 // div):
+                v = joint_grad[a, b, c, d]
+                base_v = img_grad[a, b]
+                filt_v = fil_grad[c, d]
+                if v > 0 and base_v > 0 and filt_v > 0:
+                    d = base_v * filt_v
+                    t = np.log2(v / d)
+                    r = v * t
+                    m2 += r
+
+f'Gradient mutual: {m2}'
+
+joint = hist_base.T.dot(hist_filt)
+joint /= joint.max()
 
 f'Intensity: {mutual_information}'
 
