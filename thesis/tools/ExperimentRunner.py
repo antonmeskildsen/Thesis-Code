@@ -21,11 +21,13 @@ from tools.st_utils import file_select, type_name, json_to_strategy, progress, f
 from tools.cli.utilities import load_iris_data, load_gaze_data, load_pupil_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, PopulationInitializer
 from thesis.optim import sampling
-from thesis.optim.filters import bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, salt_and_pepper
-from thesis.optim.objective_terms import AbsoluteGradientEntropy, RelativeGradientEntropy, AbsoluteGazeAccuracy, \
-    RelativeGazeAccuracy, IrisCodeSimilarity, ImageSimilarity, AbsolutePupilDistanceBaseAlgorithm, \
-    AbsolutePupilDistanceElse, AbsolutePupilDistanceExcuse, RelativePupilDistanceBaseAlgorithm, \
-    RelativePupilDistanceElse, RelativePupilDistanceExcuse
+from thesis.optim.filters import bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, salt_and_pepper, \
+    cauchy_noise
+from thesis.optim.objective_terms import AbsoluteGradientEntropy, RelativeGradientEntropy, AbsoluteMutualInformation, \
+    RelativeMutualInformation, AbsoluteGazeAccuracy, RelativeGazeAccuracy, IrisCodeSimilarity, ImageSimilarity, \
+    AbsolutePupilDistanceBaseAlgorithm, AbsolutePupilDistanceElse, AbsolutePupilDistanceExcuse, \
+    RelativePupilDistanceBaseAlgorithm, RelativePupilDistanceElse, RelativePupilDistanceExcuse, \
+    AbsoluteOriginalGradientEntropy
 from thesis.optim.population import TruncationSelection, TournamentSelection, UniformCrossover, GaussianMutation
 
 st.title('Obfuscation Experiment')
@@ -81,9 +83,14 @@ st.sidebar.write("""
 """)
 
 iris_metrics = st.sidebar.multiselect('Iris metrics',
-                                      (AbsoluteGradientEntropy, RelativeGradientEntropy, IrisCodeSimilarity,
-                                       ImageSimilarity),
-                                      default=(AbsoluteGradientEntropy,), format_func=type_name)
+                                      (IrisCodeSimilarity,),
+                                      default=(IrisCodeSimilarity,), format_func=type_name)
+histogram_metrics = st.sidebar.multiselect('Histogram metrics',
+                                           (
+                                               AbsoluteGradientEntropy, AbsoluteOriginalGradientEntropy,
+                                               RelativeGradientEntropy, AbsoluteMutualInformation,
+                                               RelativeMutualInformation),
+                                           default=(RelativeMutualInformation,), format_func=type_name)
 gaze_metrics = st.sidebar.multiselect('Gaze metrics', (AbsoluteGazeAccuracy, RelativeGazeAccuracy),
                                       default=(AbsoluteGazeAccuracy,), format_func=type_name)
 pupil_metrics = st.sidebar.multiselect('Pupil metrics',
@@ -93,11 +100,13 @@ pupil_metrics = st.sidebar.multiselect('Pupil metrics',
                                        default=(AbsolutePupilDistanceElse,), format_func=type_name)
 
 iris_terms = list(map(lambda x: x(), iris_metrics))
+histogram_terms = list(map(lambda x: x(), histogram_metrics))
 gaze_terms = list(map(lambda x: x(), gaze_metrics))
 pupil_terms = list(map(lambda x: x(), pupil_metrics))
 
 filters = st.sidebar.multiselect('Filter types',
-                                 (gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper),
+                                 (gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper,
+                                  cauchy_noise),
                                  default=(gaussian_filter,),
                                  format_func=type_name)
 
@@ -124,7 +133,6 @@ iris_samples = st.sidebar.number_input('Iris Samples', 1, min(map(len, iris_data
 gaze_samples = st.sidebar.number_input('Gaze Samples', 1, min(map(len, gaze_data)), 50)
 pupil_samples = st.sidebar.number_input('Pupil Samples', 1, min(map(len, pupil_data)), 50)
 
-
 st.sidebar.markdown('### Optimizer parameters')
 
 params = {}
@@ -137,9 +145,14 @@ if method == NaiveMultiObjectiveOptimizer:
     sampling = st.sidebar.selectbox('Sampling technique', (GridSearch, UniformSampler), format_func=type_name)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms, pupil_terms,
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, histogram_terms, gaze_terms,
+                                         pupil_terms,
                                          iris_samples, gaze_samples, pupil_samples)
-        sampler: Sampler = sampling(*json_to_strategy(config[f.__name__]))
+        params, generators = json_to_strategy(config[f.__name__])
+        for p, g in zip(params, generators):
+            f'Param: {p}'
+            st.write(g)
+        sampler: Sampler = sampling(params, generators)
         projected_iterations += len(sampler)
         optimizers[f.__name__] = method([], objective, sampler)
 
@@ -161,7 +174,8 @@ elif method == PopulationMultiObjectiveOptimizer:
     projected_iterations = iterations * pop_num * len(filters)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms, pupil_terms,
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, histogram_terms, gaze_terms,
+                                         pupil_terms,
                                          iris_samples, gaze_samples, pupil_samples)
         init = PopulationInitializer(*make_strategy(config[f.__name__], pop_num))
 

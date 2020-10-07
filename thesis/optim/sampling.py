@@ -27,8 +27,8 @@ def samples_step(start, stop, step=1, *, stratified=True):
 
     """
     nums = np.arange(start, stop, step)
-    if stratified:
-        nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
+    # if stratified:
+    #     nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
     return nums
 
 
@@ -45,9 +45,9 @@ def samples_num(start, stop, num, *, stratified=True):
 
     """
     nums = np.linspace(start, stop, num)
-    step = 1 if num == 0 else (stop - start) / num
-    if stratified:
-        nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
+    # step = 1 if num == 0 else (stop - start) / num
+    # if stratified:
+    #     nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
     return nums.clip(start, stop)
 
 
@@ -66,9 +66,9 @@ def samples_exp(start, stop, num, exp, *, stratified=True):
         """
     nums = (np.logspace(0, 1, num, base=exp) - 1)/(exp-1)  # Create and adjust to the interval ]0, 1[
     nums = nums * (stop-start) + start  # Scale
-    step = 1 if num == 0 else (stop - start) / num
-    if stratified:
-        nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
+    # step = 1 if num == 0 else (stop - start) / num
+    # if stratified:
+    #     nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
     return nums.clip(start, stop)
 
 

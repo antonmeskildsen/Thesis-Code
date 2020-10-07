@@ -1,3 +1,5 @@
+import math
+
 import eyeinfo
 
 import numpy as np
@@ -9,11 +11,11 @@ GRAD_RESOLUTION = 255 * 2 + 1
 
 
 def dx(img):
-    return cv.Sobel(img, cv.CV_32F, 1, 0, ksize=3)
+    return cv.Sobel(img, cv.CV_64F, 1, 0, ksize=3)
 
 
 def dy(img):
-    return cv.Sobel(img, cv.CV_32F, 0, 1, ksize=3)
+    return cv.Sobel(img, cv.CV_64F, 0, 1, ksize=3)
 
 
 def gradient_histogram(img, mask=None):
@@ -28,7 +30,11 @@ def gradient_histogram(img, mask=None):
     return hist
 
 
-def joint_gradient_histogram(img_a, img_b, divisions=4):
+def joint_gradient_histogram(img_a, img_b, mask=None, divisions=4):
+    img_a = img_a.copy()
+    img_b = img_b.copy()
+    # img_a[mask == 0] = img_a.min()
+    # img_b[mask == 0] = img_b.min()
     img_a = cv.equalizeHist(img_a)
     img_b = cv.equalizeHist(img_b)
 
@@ -36,34 +42,31 @@ def joint_gradient_histogram(img_a, img_b, divisions=4):
     ym_a = dy(img_a)
     xm_b = dx(img_b)
     ym_b = dy(img_b)
-    xm_a = np.int32(xm_a / xm_a.max() * (divisions // 2))
-    ym_a = np.int32(ym_a / ym_a.max() * (divisions // 2))
-    xm_b = np.int32(xm_b / xm_b.max() * (divisions // 2))
-    ym_b = np.int32(ym_b / ym_b.max() * (divisions // 2))
 
-    hist_a = np.zeros((divisions, divisions))
-    hist_b = np.zeros((divisions, divisions))
+    all_max = max(np.abs(xm_a).max(), np.abs(ym_a).max(), np.abs(xm_b).max(), np.abs(ym_b).max())
 
-    hist_joint = defaultdict(lambda: np.double(0))
+    eps = 10e-6
+    xm_a = np.int16(xm_a / 1024 * (divisions // 2 - eps))
+    ym_a = np.int16(ym_a / 1024 * (divisions // 2 - eps))
+    xm_b = np.int16(xm_b / 1024 * (divisions // 2 - eps))
+    ym_b = np.int16(ym_b / 1024 * (divisions // 2 - eps))
 
-    offset = (divisions // 2) - 1
-    height, width = img_a.shape
-    for y in range(height):
-        for x in range(width):
-            hist_joint[(ym_a[y, x] + offset,
-                        xm_a[y, x] + offset,
-                        ym_b[y, x] + offset,
-                        xm_b[y, x] + offset)] += 1
-            hist_a[ym_a[y, x] + offset, xm_a[y, x] + offset] += 1
-            hist_b[ym_b[y, x] + offset, xm_b[y, x] + offset] += 1
+    if mask is None:
+        mask = np.ones(xm_a.shape, dtype=np.uint8)
 
-    joint_sum = height * width
-    assert height * width == sum(hist_joint.values())
-    hist_joint = defaultdict(float, {k: v / joint_sum for k, v in hist_joint.items()})
-    hist_a /= hist_a.sum()
-    hist_b /= hist_b.sum()
+    hist_a, hist_b, hist_joint = eyeinfo.joint_gradient_histogram(xm_a, ym_a, xm_b, ym_b, mask, divisions)
 
+    # total = mask[mask > 0].sum()
+    # decimal_precision = math.floor(np.log10(total))
+
+    # hist_a = np.round(hist_a, decimal_precision)
+    # hist_b = np.round(hist_b, decimal_precision)
+    # hist_joint = {k: round(v, decimal_precision) for k, v in hist_joint.items()}
     return hist_a, hist_b, hist_joint
+
+
+def mutual_information_grad(hist_a, hist_b, hist_joint):
+    return eyeinfo.mutual_information_grad(hist_a, hist_b, hist_joint)
 
 
 def mutual_information(hist_a, hist_b, hist_joint):
@@ -88,8 +91,8 @@ def joint_histogram(img_a, img_b, divisions=32):
     img_a = np.int32(img_a / img_a.max() * (divisions // 2))
     img_b = np.int32(img_b / img_b.max() * (divisions // 2))
 
-    hist_a = np.zeros((divisions))
-    hist_b = np.zeros((divisions))
+    hist_a = np.zeros(divisions)
+    hist_b = np.zeros(divisions)
 
     hist_joint = defaultdict(float)
 

@@ -8,8 +8,9 @@ import numpy as np
 from thesis.data import SegmentationDataset, GazeDataset, PupilDataset
 from thesis.optim.pareto import dominates
 from thesis.optim.sampling import Sampler, PopulationInitializer
-from thesis.optim.objective_terms import GazeTerm, SegmentationTerm, PupilTerm
+from thesis.optim.objective_terms import GazeTerm, SegmentationTerm, PupilTerm, GradientHistogramTerm
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
+from thesis.entropy import joint_gradient_histogram, entropy, mutual_information_grad
 
 
 class Objective(ABC):
@@ -35,6 +36,7 @@ class ObfuscationObjective(Objective):
     pupil_datasets: List[PupilDataset]
 
     iris_terms: List[SegmentationTerm]
+    histogram_terms: List[GradientHistogramTerm]
     gaze_terms: List[GazeTerm]
     pupil_terms: List[PupilTerm]
 
@@ -44,11 +46,13 @@ class ObfuscationObjective(Objective):
 
     def metrics(self) -> List[str]:
         return list(map(lambda x: type(x).__name__, self.iris_terms)) + \
+               list(map(lambda x: type(x).__name__, self.histogram_terms)) + \
                list(map(lambda x: type(x).__name__, self.gaze_terms)) + \
                list(map(lambda x: type(x).__name__, self.pupil_terms))
 
     def eval(self, params):
         iris_results = [[] for _ in range(len(self.iris_terms))]
+        histogram_results = [[] for _ in range(len(self.histogram_terms))]
         gaze_results = [[] for _ in range(len(self.gaze_terms))]
         pupil_results = [[] for _ in range(len(self.pupil_terms))]
 
@@ -58,6 +62,13 @@ class ObfuscationObjective(Objective):
                 output = self.filter(sample.image.image, **params)
                 for i, term in enumerate(self.iris_terms):
                     iris_results[i].append(term(sample, output))
+                hist_source, hist_filtered, hist_joint = joint_gradient_histogram(sample.image.image, output,
+                                                                                  sample.image.mask, divisions=512)
+                entropy_source = entropy(hist_source)
+                entropy_filtered = entropy(hist_filtered)
+                mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
+                for i, term in enumerate(self.histogram_terms):
+                    histogram_results[i].append(term(entropy_source, entropy_filtered, mutual_information))
 
         samples_per_set = self.gaze_samples // len(self.gaze_datasets)
         for dataset in self.gaze_datasets:
@@ -73,7 +84,8 @@ class ObfuscationObjective(Objective):
                 for i, term in enumerate(self.pupil_terms):
                     pupil_results[i].append(term(sample, output))
 
-        return list(map(np.mean, iris_results)) + list(map(np.mean, gaze_results)) + list(map(np.mean, pupil_results))
+        return list(map(np.mean, iris_results)) + list(map(np.mean, histogram_results)) + list(
+            map(np.mean, gaze_results)) + list(map(np.mean, pupil_results))
 
     def output_dimensions(self):
         return len(self.iris_terms) + len(self.gaze_terms)
