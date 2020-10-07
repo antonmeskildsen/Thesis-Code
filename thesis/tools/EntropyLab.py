@@ -2,6 +2,7 @@ import streamlit as st
 
 import os
 import json
+import math
 from glob2 import glob
 from collections import defaultdict
 
@@ -10,17 +11,23 @@ import cv2 as cv
 
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
+
+import time
+
+import altair as alt
 
 from thesis.entropy import gradient_histogram, histogram, entropy
 from thesis.segmentation import IrisSegmentation, IrisImage, IrisCodeEncoder
-from thesis.entropy import dx, dy, joint_gradient_histogram, gradient_histogram, entropy, mutual_information, joint_histogram
+from thesis.entropy import dx, dy, joint_gradient_histogram, gradient_histogram, entropy, mutual_information, \
+    joint_histogram, mutual_information_grad
 
 """
 # Entropy Test Lab
 """
 
-base = '/home/anton/data/eyedata/iris'
-# base = '/Users/Anton/Desktop/data/iris'
+# base = '/home/anton/data/eyedata/iris'
+base = '/Users/Anton/Desktop/data/iris'
 
 files = glob(os.path.join(base, '*.json'))
 names = [os.path.basename(p).split('.')[0] for p in files]
@@ -60,7 +67,7 @@ tmp_img = IrisImage(seg, img)
 # for x in range(0, filtered.shape[1] // s, 2):
 #     filtered[:, x * s:(x + 1) * s] += 35
 # filtered = np.uint8(np.clip(filtered, 0, 255))
-filtered = cv.GaussianBlur(filtered, (0, 0), 5)
+filtered = cv.GaussianBlur(filtered, (0, 0), 1)
 # filtered = cv.medianBlur(img, 55)
 # filtered = cv.bilateralFilter(img, 0, 50, 80)
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
@@ -125,18 +132,56 @@ mi = mutual_information(hist_base, hist_filt, joint)
 
 div = 128
 
+st.image(iris_img.mask * 255)
 
-img_grad, fil_grad, joint_grad = joint_gradient_histogram(pimg, pfiltered, divisions=8)
+d = st.slider('Number of Divisions', 4, 512, 16)
+t = time.perf_counter()
+img_grad, fil_grad, joint_grad = joint_gradient_histogram(img, filtered, mask=iris_img.mask, divisions=d)
+elapsed = time.perf_counter() - t
+f'Elapsed time for gradient histogram: {elapsed:.4f} seconds'
+
+# fig, ax = plt.subplots()
+# ax.imshow(img_grad-fil_grad)
+# st.pyplot(fig)
+
+eps = 10e-5
+
+# st.write({str(k): v for k, v in joint_grad.items()})
+# st.write(img_grad)
+# st.write(fil_grad)
+
+log_norm_img = LogNorm(vmin=img_grad.min() + eps, vmax=img_grad.max())
+log_norm_fil = LogNorm(vmin=fil_grad.min() + eps, vmax=fil_grad.max())
+cbar_ticks_img = [math.pow(10, i) for i in
+                  range(math.floor(math.log10(img_grad.min() + eps)), 1 + math.ceil(math.log10(img_grad.max())))]
+cbar_ticks_fil = [math.pow(10, i) for i in
+                  range(math.floor(math.log10(fil_grad.min() + eps)), 1 + math.ceil(math.log10(fil_grad.max())))]
 
 fig, ax = plt.subplots(2, 1)
-sns.heatmap(img_grad, ax=ax[0])
-sns.heatmap(fil_grad, ax=ax[1])
+sns.heatmap(img_grad, ax=ax[0], norm=log_norm_img, cbar_kws={'ticks': cbar_ticks_img})
+sns.heatmap(fil_grad, ax=ax[1], norm=log_norm_fil, cbar_kws={'ticks': cbar_ticks_fil})
 st.pyplot(fig)
+
+# for pos, v in joint_grad.items():
+#     val_a = img_grad[pos[:2]]
+#     val_b = img_grad[pos[2:]]
+#
+#     if val_a == 0 or val_b == 0:
+#         continue
+#
+#     e_joint = v * (np.log2(v) - np.log2(val_a) - np.log2(val_b))
+#     e_single = -val_a * np.log2(val_a)
+#     if e_joint != e_single:
+#         f'Mismatch at ({pos}): {e_joint}, {e_single}'
+#         f'Values: joint: {v}, img_grad: {val_a}, fil_grad: {val_b}'
 
 e = entropy(img_grad)
 f'Gradient entropy of original: {e}'
 
-m2 = mutual_information(img_grad, fil_grad, joint_grad)
+t = time.perf_counter()
+m2 = mutual_information_grad(img_grad, fil_grad, joint_grad)
+elapsed = time.perf_counter() - t
+f'Elapsed time for entropy calculation: {elapsed:.4f} seconds'
 
 # for a in range(512 // div):
 #     for b in range(512 // div):
@@ -154,8 +199,7 @@ m2 = mutual_information(img_grad, fil_grad, joint_grad)
 
 f'Gradient mutual: {m2}'
 
-
-f'Ratio: {(e-m2)/e * 100:.2f} %'
+f'Ratio: {(e - m2) / e * 100:.2f} %'
 
 joint = hist_base.T.dot(hist_filt)
 joint /= joint.max()
@@ -163,8 +207,7 @@ joint /= joint.max()
 ei = entropy(hist_base)
 f'Intensity original: {ei}'
 f'Intensity: {mi}'
-f'Ratio: {(ei-mi)/ei * 100:.2f}%'
-
+f'Ratio: {(ei - mi) / ei * 100:.2f}%'
 
 pimg = cv.resize(pimg, (0, 0), fx=4, fy=4)
 pfiltered = cv.resize(pfiltered, (0, 0), fx=4, fy=4)

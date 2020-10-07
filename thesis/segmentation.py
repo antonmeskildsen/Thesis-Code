@@ -57,37 +57,47 @@ class IrisImage:
             self.image = image
         self.mask = segmentation.get_mask((image.shape[1], image.shape[0]))
 
+        self.polar = None
+        self.saved_angular_resolution = 0
+        self.saved_radial_resolution = 0
+
     @staticmethod
     def from_dict(data: dict) -> IrisImage:
         segmentation = IrisSegmentation.from_dict(data['points'])
         image = cv.imread(data['image'])
         return IrisImage(segmentation, image)
 
-    def to_polar(self, angular_resolution, linear_resolution, start_angle=0) -> (np.ndarray, np.ndarray):
+    def to_polar(self, angular_resolution, radial_resolution, start_angle=0) -> (np.ndarray, np.ndarray):
         """Create polar image.
 
         Args:
             angular_resolution: Number of angular stops.
-            linear_resolution: Number of stops from pupil to iris.
+            radial_resolution: Number of stops from pupil to iris.
             start_angle:
 
         Returns:
 
         """
-        output = np.zeros((linear_resolution, angular_resolution), np.uint8)
-        output_mask = np.zeros((linear_resolution, angular_resolution), np.uint8)
+        if self.saved_angular_resolution != angular_resolution \
+                or self.saved_radial_resolution != radial_resolution \
+                or self.polar is None:
 
-        angle_steps = np.linspace(start_angle, start_angle + 2 * np.pi, angular_resolution)
-        for i, theta in enumerate(angle_steps):
-            start, stop = self.segmentation.intersect_angle(theta)
-            x_coord, y_coord = start.linear_interpolation(stop, linear_resolution)
-            for j, (x, y) in enumerate(zip(x_coord, y_coord)):
-                if x < 0 or y < 0 or x >= self.image.shape[1] or y >= self.image.shape[0]:
-                    continue
-                output[j, i] = self.image[int(y), int(x)]
-                output_mask[j, i] = self.mask[int(y), int(x)]
+            output = np.zeros((radial_resolution, angular_resolution), np.uint8)
+            output_mask = np.zeros((radial_resolution, angular_resolution), np.uint8)
 
-        return output, output_mask
+            angle_steps = np.linspace(start_angle, start_angle + 2 * np.pi, angular_resolution)
+            for i, theta in enumerate(angle_steps):
+                start, stop = self.segmentation.intersect_angle(theta)
+                x_coord, y_coord = start.linear_interpolation(stop, radial_resolution)
+                for j, (x, y) in enumerate(zip(x_coord, y_coord)):
+                    if x < 0 or y < 0 or x >= self.image.shape[1] or y >= self.image.shape[0]:
+                        continue
+                    output[j, i] = self.image[int(y), int(x)]
+                    output_mask[j, i] = self.mask[int(y), int(x)]
+
+            self.polar = output, output_mask
+
+        return self.polar
 
 
 @dataclass
@@ -172,7 +182,7 @@ class SKImageIrisCodeEncoder:
         self.radial_resolution = radial_resolution
         self.eps = eps
         frequencies = 6
-        freqs = np.logspace(0.05, 1.0, frequencies)/10
+        freqs = np.logspace(0.05, 1.0, frequencies) / 10
         for theta in range(0, angles):
             a = theta / angles * np.pi / 2
             for freq in freqs:

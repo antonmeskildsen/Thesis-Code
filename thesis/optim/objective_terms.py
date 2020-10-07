@@ -5,12 +5,16 @@ import cv2 as cv
 import numpy as np
 
 from thesis.data import SegmentationSample, GazeImage, PupilSample
-from entropy import gradient_histogram, histogram, entropy
+from thesis.entropy import gradient_histogram, histogram, entropy, \
+    mutual_information_grad
 from thesis.tracking.gaze import GazeModel
 from thesis.tracking.features import normalize_coordinates, pupil_detector
 from thesis.segmentation import IrisCodeEncoder, IrisImage
 
 from pupilfit import fit_else, fit_excuse
+
+ANGULAR_RES = 30
+RADIAL_RES = 18
 
 
 def bilateral_filter(img, kernel_size, sigma_c, sigma_s):
@@ -39,6 +43,15 @@ class SegmentationTerm(ABC):
         ...
 
 
+class GradientHistogramTerm(ABC):
+    def __init__(self):
+        ...
+
+    @abstractmethod
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        ...
+
+
 class GazeTerm(ABC):
     def __init__(self):
         ...
@@ -57,19 +70,37 @@ class PupilTerm(ABC):
         ...
 
 
-class AbsoluteGradientEntropy(SegmentationTerm):
-    def __call__(self, sample: SegmentationSample, filtered: np.ndarray) -> float:
-        hist = gradient_histogram(filtered, sample.image.mask)
-        return entropy(hist)
+class AbsoluteGradientEntropy(GradientHistogramTerm):
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        return entropy_filtered
 
 
-class RelativeGradientEntropy(SegmentationTerm):
-    def __call__(self, sample: SegmentationSample, filtered: np.ndarray) -> float:
-        hist_a = gradient_histogram(sample.image.image, sample.image.mask)
-        hist_b = gradient_histogram(filtered, sample.image.mask)
-        entropy_a = entropy(hist_a)
-        entropy_b = entropy(hist_b)
-        return entropy_b / entropy_a
+class AbsoluteOriginalGradientEntropy(GradientHistogramTerm):
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        return entropy_source
+
+
+class RelativeGradientEntropy(GradientHistogramTerm):
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        return entropy_filtered / entropy_source
+
+
+# TODO: Add masks to calculation!
+def get_polar_images(sample: SegmentationSample, filtered: np.ndarray) -> (np.ndarray, np.ndarray):
+    sample_polar, _ = sample.image.to_polar(ANGULAR_RES, RADIAL_RES)
+    filtered_img = IrisImage(sample.image.segmentation, filtered)
+    filtered_polar, _ = filtered_img.to_polar(ANGULAR_RES, RADIAL_RES)
+    return sample_polar, filtered_polar
+
+
+class AbsoluteMutualInformation(GradientHistogramTerm):
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        return mutual_information
+
+
+class RelativeMutualInformation(GradientHistogramTerm):
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        return mutual_information / entropy_source
 
 
 class IrisCodeSimilarity(SegmentationTerm):
@@ -97,7 +128,11 @@ class ImageSimilarity(SegmentationTerm):
         sample_masked = sample.image.image * sample.image.mask
         sample_masked = sample_masked / np.linalg.norm(sample_masked)
         filtered_masked = filtered * sample.image.mask / 255
-        filtered_masked = filtered_masked / np.linalg.norm(filtered_masked)
+        norm = np.linalg.norm(filtered_masked)
+        if norm == 0:
+            filtered_masked = np.zeros(filtered_masked.shape)
+        else:
+            filtered_masked = filtered_masked / np.linalg.norm(filtered_masked)
         dist = np.linalg.norm(sample_masked - filtered_masked)
         return 1 - dist
 
