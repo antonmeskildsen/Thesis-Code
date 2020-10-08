@@ -1,9 +1,0 @@
-gaze_data:
-  - '/Users/Anton/Desktop/data/caps/cap04/'
-
-iris_data:
-  - '/Users/Anton/Desktop/data/iris/casia4i_sample.json'
-
-optimization:
-  filter_config: bilateral_filter
-  strategy: uniform_sampler

@@ -13,5 +13,6 @@ setuptools.setup(
     entry_points='''
         [console_scripts]
         data=thesis.tools.cli.data_tool:data
+        filter-exp=thesis.tools.cli.filter_experiment:main
     '''
 )

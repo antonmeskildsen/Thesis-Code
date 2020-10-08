@@ -11,11 +11,13 @@ GRAD_RESOLUTION = 255 * 2 + 1
 
 
 def dx(img):
-    return cv.Sobel(img, cv.CV_64F, 1, 0, ksize=3)
+    # return cv.Sobel(img, cv.CV_64F, 1, 0, ksize=3)
+    return cv.Scharr(img, cv.CV_64F, 1, 0)
 
 
 def dy(img):
-    return cv.Sobel(img, cv.CV_64F, 0, 1, ksize=3)
+    # return cv.Sobel(img, cv.CV_64F, 0, 1, ksize=3)
+    return cv.Scharr(img, cv.CV_64F, 0, 1)
 
 
 def gradient_histogram(img, mask=None):
@@ -46,10 +48,10 @@ def joint_gradient_histogram(img_a, img_b, mask=None, divisions=4):
     all_max = max(np.abs(xm_a).max(), np.abs(ym_a).max(), np.abs(xm_b).max(), np.abs(ym_b).max())
 
     eps = 10e-6
-    xm_a = np.int16(xm_a / 1024 * (divisions // 2 - eps))
-    ym_a = np.int16(ym_a / 1024 * (divisions // 2 - eps))
-    xm_b = np.int16(xm_b / 1024 * (divisions // 2 - eps))
-    ym_b = np.int16(ym_b / 1024 * (divisions // 2 - eps))
+    xm_a = np.int16(xm_a / all_max * (divisions // 2 - eps))
+    ym_a = np.int16(ym_a / all_max * (divisions // 2 - eps))
+    xm_b = np.int16(xm_b / all_max * (divisions // 2 - eps))
+    ym_b = np.int16(ym_b / all_max * (divisions // 2 - eps))
 
     if mask is None:
         mask = np.ones(xm_a.shape, dtype=np.uint8)

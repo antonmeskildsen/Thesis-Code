@@ -12,6 +12,8 @@ from thesis.optim.objective_terms import GazeTerm, SegmentationTerm, PupilTerm, 
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
 from thesis.entropy import joint_gradient_histogram, entropy, mutual_information_grad
 
+from memory_profiler import profile
+
 
 class Objective(ABC):
 
@@ -50,6 +52,7 @@ class ObfuscationObjective(Objective):
                list(map(lambda x: type(x).__name__, self.gaze_terms)) + \
                list(map(lambda x: type(x).__name__, self.pupil_terms))
 
+    # @profile
     def eval(self, params):
         iris_results = [[] for _ in range(len(self.iris_terms))]
         histogram_results = [[] for _ in range(len(self.histogram_terms))]
@@ -63,10 +66,14 @@ class ObfuscationObjective(Objective):
                 for i, term in enumerate(self.iris_terms):
                     iris_results[i].append(term(sample, output))
                 hist_source, hist_filtered, hist_joint = joint_gradient_histogram(sample.image.image, output,
-                                                                                  sample.image.mask, divisions=512)
+                                                                                  sample.image.mask, divisions=32)
                 entropy_source = entropy(hist_source)
                 entropy_filtered = entropy(hist_filtered)
                 mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
+
+                # del hist_source
+                # del hist_filtered
+                # del hist_joint
                 for i, term in enumerate(self.histogram_terms):
                     histogram_results[i].append(term(entropy_source, entropy_filtered, mutual_information))
 
@@ -74,15 +81,16 @@ class ObfuscationObjective(Objective):
         for dataset in self.gaze_datasets:
             for sample in random.sample(dataset.test_samples, samples_per_set):
                 output = self.filter(sample.image, **params)
-                for i, term in enumerate(self.gaze_terms):
-                    gaze_results[i].append(term(dataset.model, sample, output))
+                # for i, term in enumerate(self.gaze_terms):
+                #     gaze_results[i].append(term(dataset.model, sample, output))
 
         samples_per_set = self.pupil_samples // len(self.pupil_datasets)
         for dataset in self.pupil_datasets:
             for sample in random.sample(dataset.samples, samples_per_set):
-                output = self.filter(sample.image, **params)
-                for i, term in enumerate(self.pupil_terms):
-                    pupil_results[i].append(term(sample, output))
+                # output = self.filter(sample.image, **params)
+                # for i, term in enumerate(self.pupil_terms):
+                #     pupil_results[i].append(term(sample, output))
+                ...
 
         return list(map(np.mean, iris_results)) + list(map(np.mean, histogram_results)) + list(
             map(np.mean, gaze_results)) + list(map(np.mean, pupil_results))
