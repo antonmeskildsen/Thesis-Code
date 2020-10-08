@@ -148,7 +148,7 @@ class RelativeGazeAccuracy(GazeTerm):
     def __call__(self, model: GazeModel, sample: GazeImage, filtered: np.ndarray) -> float:
         gaze_a = model.predict(sample.image)
         gaze_b = model.predict(filtered)
-        screen = normalize_coordinates(np.array([sample.screen_position]), 2160, 3840)
+        screen = normalize_coordinates(np.array([sample.screen_position]), 2160, 3840) # TODO: Set resolution!
         dist_a = np.linalg.norm(np.array(gaze_a) - np.array(screen))
         dist_b = np.linalg.norm(np.array(gaze_b) - np.array(screen))
 
@@ -171,7 +171,7 @@ def pupil_distance_relative(detector: Callable, sample: PupilSample, filtered: n
     dist_unmodified = np.linalg.norm(np.array(predicted_unmodified) - np.array(sample.center))
     dist_filtered = np.linalg.norm(np.array(predicted_filtered) - np.array(sample.center))
 
-    return dist_filtered / dist_unmodified
+    return dist_filtered / (dist_unmodified + 10e-6)
 
 
 def fit_else_center(image: np.ndarray) -> (float, float):

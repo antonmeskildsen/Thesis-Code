@@ -133,6 +133,7 @@ class PupilDataset:
         with open(path) as file:
             data = json.load(file)
             images = map(PupilSample.from_json, data['data'])
+            images = filter(lambda x: os.path.isfile(x.image_path), images)
 
             if 'name' in data:
                 name = data['name']
