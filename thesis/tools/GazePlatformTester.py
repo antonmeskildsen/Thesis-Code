@@ -34,8 +34,8 @@ st.info('Loading Tensorflow model into memory')
 st.title('Gaze experiments')
 
 # path = '/home/anton/data/cap04'
-sets = glob(os.path.join('/Users/Anton/Desktop/data/gaze/', '**/'), recursive=True)
-# sets = glob(os.path.join('/home/anton/data/eyedata/gaze', '**/'), recursive=True)
+# sets = glob(os.path.join('/Users/Anton/Desktop/data/gaze/', '**/'), recursive=True)
+sets = glob(os.path.join('/home/anton/data/eyedata/gaze', '**/'), recursive=True)
 path = st.selectbox('Dataset', sets)
 
 gaze_positions = load_json(path, 'positions')
