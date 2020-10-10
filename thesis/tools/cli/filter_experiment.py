@@ -17,6 +17,7 @@ from thesis.optim import filters
 from thesis.optim import objective_terms
 from thesis.tools.cli.utilities import load_gaze_data, load_iris_data, load_pupil_data
 from thesis.tools.st_utils import json_to_strategy
+from thesis.optim.status import TQDMBar
 
 from memory_profiler import profile
 
@@ -122,7 +123,7 @@ def main(config, name):
 
         for filter_name, o in optimizers.items():
             f'Running optimizer for {filter_name}'
-            o.run(wrapper=progress_tqdm)
+            o.run(wrapper=tqdm, parallel=True)
 
         'Results computed!'
 

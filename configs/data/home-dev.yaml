@@ -7,4 +7,4 @@ iris_data:
   - '/home/anton/data/eyedata/iris/casia4i.json'
 
 pupil_data:
-  - '/home/anton/data/eyedata/pupil/info.json'
+  - '/home/anton/data/eyedata/pupil/excuse/info.json'

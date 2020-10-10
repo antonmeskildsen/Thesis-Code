@@ -11,25 +11,28 @@ import cv2 as cv
 from thesis.geometry import Ellipse
 from thesis.segmentation import IrisImage
 from thesis.tracking.gaze import GazeModel, BasicGaze
-from thesis.tracking.features import normalize_coordinates
+from thesis.tracking.features import normalize_coordinates, pupil_detector
 
 from thesis.tools.st_utils import fit_else_ref, create_deepeye_func
 
 
 @dataclass
 class GazeImage:
-    image: np.ndarray
+    image_path: str
     # pupil: Ellipse
     # glints: List[(float, float)]
     screen_position: (int, int)
 
+    @property
+    def image(self):
+        return cv.imread(self.image_path, cv.IMREAD_GRAYSCALE)
+
     @staticmethod
     def from_json(path: str, data: dict):
-        image = cv.imread(os.path.join(path, data['image']), cv.IMREAD_GRAYSCALE)
         # pupil = Ellipse.from_dict(data['pupil'])
         # glints = data['glints']
         screen_position = data['position']
-        return GazeImage(image, screen_position)
+        return GazeImage(os.path.join(path, data['image']), screen_position)
 
 
 @dataclass

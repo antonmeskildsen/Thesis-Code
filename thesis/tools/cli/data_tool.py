@@ -9,6 +9,7 @@ from enum import Enum
 import click
 from glob2 import glob
 from tqdm import tqdm
+import random
 
 
 class EyeSide(str, Enum):
@@ -200,9 +201,11 @@ def get(paths, limit):
                     'position': (x/2, 288 - y/2)
                 })
                 n += 1
-                if 0 < limit < n:
-                    return images
-    return images
+
+    if 0 < limit < n:
+        return random.sample(images, limit)
+    else:
+        return images
 
 
 @pupil.command()

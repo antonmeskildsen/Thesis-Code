@@ -43,15 +43,15 @@ bilateral_filter:
     type: samples_exp
     params:
       start: 1
-      stop: 30
-      num: 50
+      stop: 20
+      num: 30
       exp: 100
   sigma_c:
     type: samples_exp
     params:
       start: 5
       stop: 100
-      num: 50
+      num: 30
       exp: 100
 
 gaussian_filter:
