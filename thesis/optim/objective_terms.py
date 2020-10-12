@@ -103,6 +103,9 @@ class RelativeMutualInformation(GradientHistogramTerm):
         return mutual_information / entropy_source
 
 
+# class AbsoluteGaborMutualAt1x(GradientHistogramTerm)
+
+
 class IrisCodeSimilarity(SegmentationTerm):
     """Defined as (1-HD)"""
 
