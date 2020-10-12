@@ -19,8 +19,7 @@ import altair as alt
 
 from thesis.entropy import gradient_histogram, histogram, entropy
 from thesis.segmentation import IrisSegmentation, IrisImage, IrisCodeEncoder
-from thesis.entropy import dx, dy, joint_gradient_histogram, gradient_histogram, entropy, mutual_information, \
-    joint_histogram, mutual_information_grad
+from thesis.entropy import *
 
 """
 # Entropy Test Lab
@@ -52,7 +51,8 @@ seg = IrisSegmentation.from_dict(sample['points'])
 img = cv.imread(sample['image'], cv.IMREAD_GRAYSCALE)
 ints = st.slider('Intensity', 1, 255, 50)
 filtered = img.copy()
-filtered = np.uint8(np.clip(img + np.random.uniform(-ints // 2, ints // 2, img.shape), 0, 255))
+# filtered = np.uint8(np.clip(img + np.random.uniform(-ints // 2, ints // 2, img.shape), 0, 255))
+# img = np.uint8(np.random.uniform(0, 255, img.shape))
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
 
 tmp_img = IrisImage(seg, img)
@@ -69,9 +69,9 @@ f'Number of pixels considered: {tmp_img.mask.sum()} -> suggested bin count: {np.
 # for x in range(0, filtered.shape[1] // s, 2):
 #     filtered[:, x * s:(x + 1) * s] += 35
 # filtered = np.uint8(np.clip(filtered, 0, 255))
-# filtered = cv.GaussianBlur(filtered, (0, 0), 1)
-# filtered = cv.medianBlur(img, 55)
-# filtered = cv.bilateralFilter(img, 0, 50, 80)
+filtered = cv.GaussianBlur(filtered, (0, 0), 3)
+# filtered = cv.medianBlur(img, 3)
+# filtered = cv.bilateralFilter(img, 0, 15, 20)
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
 
 st.image([img, filtered])
@@ -124,7 +124,20 @@ div = 64
 # hist_base /= hist_base.sum()
 # hist_filt /= hist_filt.sum()
 
-hist_base, hist_filt, joint = joint_histogram(img, filtered, 512)
+divi = 512
+hist_base, hist_filt, joint = joint__gabor_1d_histogram(img, filtered, iris_img.mask, divi)
+
+fig, ax = plt.subplots()
+ax.bar(np.arange(0, divi, 1), hist_base)
+ax.bar(np.arange(0, divi, 1), hist_filt)
+st.pyplot(fig)
+
+fig, ax = plt.subplots()
+j2 = np.zeros((divi, divi))
+for k, v in joint.items():
+    j2[k] = v
+sns.heatmap(j2, ax=ax)
+st.pyplot(fig)
 
 # fig, ax = plt.subplots()
 # sns.heatmap(joint, ax=ax)
@@ -138,7 +151,7 @@ st.image(iris_img.mask * 255)
 
 d = st.slider('Number of Divisions', 4, 512, 16)
 t = time.perf_counter()
-img_grad, fil_grad, joint_grad = joint_gradient_histogram(img, filtered, mask=iris_img.mask, divisions=d)
+img_grad, fil_grad, joint_grad = joint_gabor_histogram(img, filtered, mask=iris_img.mask, scale=1, theta=0, divisions=d)
 elapsed = time.perf_counter() - t
 f'Elapsed time for gradient histogram: {elapsed:.4f} seconds'
 
@@ -214,7 +227,7 @@ joint /= joint.max()
 
 ei = entropy(hist_base)
 f'Intensity original: {ei}'
-f'Intensity: {mi}'
+f'Intensity mutual: {mi}'
 f'Ratio: {(ei - mi) / ei * 100:.2f}%'
 
 pimg = cv.resize(pimg, (0, 0), fx=4, fy=4)

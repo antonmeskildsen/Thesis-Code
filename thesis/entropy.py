@@ -4,6 +4,7 @@ import eyeinfo
 
 import numpy as np
 import cv2 as cv
+from skimage.filters import gabor
 
 from collections import defaultdict
 
@@ -32,11 +33,49 @@ def gradient_histogram(img, mask=None):
     return hist
 
 
+def joint_gabor_histogram(img_a, img_b, mask=None, scale=1, theta=0, divisions=4):
+    img_a = img_a.copy()
+    img_b = img_b.copy()
+
+    img_a = cv.resize(img_a, (0, 0), fx=scale, fy=scale)
+    img_b = cv.resize(img_b, (0, 0), fx=scale, fy=scale)
+
+    # img_a = cv.equalizeHist(img_a)
+    # img_b = cv.equalizeHist(img_b)
+
+    # k = cv.getGaborKernel((0, 0), 2, 0, 2, 1)
+    # real_r = cv.filter2D(img_a, cv.CV_64F, k)
+
+    img_a = img_a / 255.0
+    img_b = img_b / 255.5
+
+    real_a, imag_a = gabor(img_a, frequency=0.4, theta=theta, bandwidth=1)
+    real_b, imag_b = gabor(img_b, frequency=0.4, theta=theta, bandwidth=1)
+
+    all_max = max(np.abs(real_a).max(), np.abs(imag_a).max(), np.abs(real_b).max(), np.abs(imag_b).max())
+    eps = 10e-6
+
+    real_a = np.int16((real_a / all_max) * (divisions // 2 - eps))
+    imag_a = np.int16((imag_a / all_max) * (divisions // 2 - eps))
+    real_b = np.int16((real_b / all_max) * (divisions // 2 - eps))
+    imag_b = np.int16((imag_b / all_max) * (divisions // 2 - eps))
+
+    if mask is None:
+        mask = np.ones(real_a.shape, dtype=np.uint8)
+    else:
+        mask = cv.resize(mask, (0, 0), fx=scale, fy=scale)
+
+    hist_a, hist_b, hist_joint = eyeinfo.joint_gradient_histogram(real_a, imag_a, real_b, imag_b, mask,
+                                                                  divisions)
+
+    return hist_a, hist_b, hist_joint
+
+
 def joint_gradient_histogram(img_a, img_b, mask=None, divisions=4):
     img_a = img_a.copy()
     img_b = img_b.copy()
-    # img_a[mask == 0] = img_a.min()
-    # img_b[mask == 0] = img_b.min()
+    img_a[mask == 0] = img_a.min()
+    img_b[mask == 0] = img_b.min()
     img_a = cv.equalizeHist(img_a)
     img_b = cv.equalizeHist(img_b)
 
@@ -58,12 +97,6 @@ def joint_gradient_histogram(img_a, img_b, mask=None, divisions=4):
 
     hist_a, hist_b, hist_joint = eyeinfo.joint_gradient_histogram(xm_a, ym_a, xm_b, ym_b, mask, divisions)
 
-    # total = mask[mask > 0].sum()
-    # decimal_precision = math.floor(np.log10(total))
-
-    # hist_a = np.round(hist_a, decimal_precision)
-    # hist_b = np.round(hist_b, decimal_precision)
-    # hist_joint = {k: round(v, decimal_precision) for k, v in hist_joint.items()}
     return hist_a, hist_b, hist_joint
 
 
@@ -85,6 +118,61 @@ def mutual_information(hist_a, hist_b, hist_joint):
             r = v * t
             e += r
     return e
+
+
+def joint__gabor_1d_histogram(img_a, img_b, mask=None, divisions=32):
+    img_a = img_a.copy()
+    img_b = img_b.copy()
+
+    scale = 0.08
+    img_a = cv.resize(img_a, (0, 0), fx=scale, fy=scale)
+    img_b = cv.resize(img_b, (0, 0), fx=scale, fy=scale)
+
+    # img_a = cv.equalizeHist(img_a)
+    # img_b = cv.equalizeHist(img_b)
+
+    # k = cv.getGaborKernel((0, 0), 2, 0, 2, 1)
+    # real_r = cv.filter2D(img_a, cv.CV_64F, k)
+
+    img_a = img_a / 255.0
+    img_b = img_b / 255.5
+
+    real_a, imag_a = gabor(img_a, frequency=0.2, theta=np.pi / 5, bandwidth=1)
+    real_b, imag_b = gabor(img_b, frequency=0.2, theta=np.pi / 5, bandwidth=1)
+
+    all_max = max(np.abs(real_a).max(), np.abs(imag_a).max(), np.abs(real_b).max(), np.abs(imag_b).max())
+    eps = 10e-6
+
+    real_a = np.int16((real_a / all_max) * (divisions // 2 - eps))
+    real_b = np.int16((real_b / all_max) * (divisions // 2 - eps))
+
+    if mask is None:
+        mask = np.ones(real_a.shape, dtype=np.uint8)
+    else:
+        mask = cv.resize(mask, (0, 0), fx=scale, fy=scale)
+
+    hist_a = np.zeros(divisions)
+    hist_b = np.zeros(divisions)
+
+    hist_joint = defaultdict(float)
+
+    offset = (divisions // 2) - 1
+    height, width = img_a.shape
+    for y in range(height):
+        for x in range(width):
+            if mask[y, x] > 0:
+                hist_joint[(real_a[y, x] + offset,
+                            real_b[y, x] + offset)] += 1
+                hist_a[real_a[y, x] + offset] += 1
+                hist_b[real_b[y, x] + offset] += 1
+
+    joint_sum = hist_a.sum()
+    assert hist_a.sum() == hist_b.sum()
+    hist_joint = defaultdict(float, {k: v / joint_sum for k, v in hist_joint.items()})
+    hist_a /= hist_a.sum()
+    hist_b /= hist_b.sum()
+
+    return hist_a, hist_b, hist_joint
 
 
 def joint_histogram(img_a, img_b, divisions=32):
