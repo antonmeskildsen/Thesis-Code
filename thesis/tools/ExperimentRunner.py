@@ -45,6 +45,7 @@ compare the methods.
 """
 
 config_file = file_select('Data configuration file', 'configs/data/*.yaml')
+config_main = config_file
 
 with open(config_file) as config_file:
     config = yaml.safe_load(config_file)
@@ -60,7 +61,7 @@ def load_data():
            load_pupil_data(config['pupil_data'])
 
 
-loaded = copy.deepcopy(load_data())
+loaded = load_data()
 gaze_data, iris_data, pupil_data = loaded
 
 '**Gaze data:**'
@@ -90,14 +91,19 @@ histogram_metrics = st.sidebar.multiselect('Histogram metrics',
                                                AbsoluteGradientEntropy, AbsoluteOriginalGradientEntropy,
                                                RelativeGradientEntropy, AbsoluteMutualInformation,
                                                RelativeMutualInformation),
-                                           default=(RelativeMutualInformation,), format_func=type_name)
+                                           default=(AbsoluteGradientEntropy, AbsoluteOriginalGradientEntropy,
+                                                    RelativeGradientEntropy, AbsoluteMutualInformation,
+                                                    RelativeMutualInformation), format_func=type_name)
 gaze_metrics = st.sidebar.multiselect('Gaze metrics', (AbsoluteGazeAccuracy, RelativeGazeAccuracy),
-                                      default=(AbsoluteGazeAccuracy,), format_func=type_name)
+                                      default=(AbsoluteGazeAccuracy, RelativeGazeAccuracy), format_func=type_name)
 pupil_metrics = st.sidebar.multiselect('Pupil metrics',
                                        (AbsolutePupilDistanceBaseAlgorithm, AbsolutePupilDistanceElse,
                                         AbsolutePupilDistanceExcuse, RelativePupilDistanceBaseAlgorithm,
                                         RelativePupilDistanceElse, RelativePupilDistanceExcuse),
-                                       default=(AbsolutePupilDistanceElse,), format_func=type_name)
+                                       default=(AbsolutePupilDistanceBaseAlgorithm, AbsolutePupilDistanceElse,
+                                                AbsolutePupilDistanceExcuse, RelativePupilDistanceBaseAlgorithm,
+                                                RelativePupilDistanceElse, RelativePupilDistanceExcuse),
+                                       format_func=type_name)
 
 iris_terms = list(map(lambda x: x(), iris_metrics))
 histogram_terms = list(map(lambda x: x(), histogram_metrics))
@@ -107,7 +113,9 @@ pupil_terms = list(map(lambda x: x(), pupil_metrics))
 filters = st.sidebar.multiselect('Filter types',
                                  (gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper,
                                   cauchy_noise),
-                                 default=(gaussian_filter,),
+                                 default=(
+                                     gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper,
+                                     cauchy_noise),
                                  format_func=type_name)
 
 st.sidebar.write(
@@ -129,9 +137,9 @@ def make_strategy(data, num):
     return parameters, generators
 
 
-iris_samples = st.sidebar.number_input('Iris Samples', 1, min(map(len, iris_data)), 50)
-gaze_samples = st.sidebar.number_input('Gaze Samples', 1, min(map(len, gaze_data)), 50)
-pupil_samples = st.sidebar.number_input('Pupil Samples', 1, min(map(len, pupil_data)), 50)
+iris_samples = st.sidebar.number_input('Iris Samples', 1, sum(map(len, iris_data)), 50)
+gaze_samples = st.sidebar.number_input('Gaze Samples', 1, sum(map(len, gaze_data)), 50)
+pupil_samples = st.sidebar.number_input('Pupil Samples', 1, sum(map(len, pupil_data)), 50)
 
 st.sidebar.markdown('### Optimizer parameters')
 
@@ -191,6 +199,35 @@ elif method == PopulationMultiObjectiveOptimizer:
 
 "### Summary"
 f'Expected number of iterations: {projected_iterations}'
+
+"""
+# Export config
+
+"""
+
+name = st.text_input('Config file name')
+
+if st.button('Export'):
+    data = {
+        'data_config': config_main,
+        'strategy_config': config_file.name,
+        'metrics': {
+            'iris_metrics': list(map(type_name, iris_metrics)),
+            'histogram_metrics': list(map(type_name, histogram_metrics)),
+            'gaze_metrics': list(map(type_name, gaze_metrics)),
+            'pupil_metrics': list(map(type_name, pupil_metrics))
+        },
+        'samples': {
+            'iris': int(iris_samples),
+            'gaze': int(gaze_samples),
+            'pupil': int(pupil_samples)
+        },
+        'filters': list(map(type_name, filters)),
+        'method': type_name(method)
+    }
+
+    with open(os.path.join('configs', 'filter_experiment', f'{name}.yaml'), 'w') as file:
+        yaml.safe_dump(data, file)
 
 st.sidebar.write("""
 ## Export

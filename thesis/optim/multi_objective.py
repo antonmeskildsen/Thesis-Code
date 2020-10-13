@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, Callable, Optional
+from typing import List, Callable, Optional, Type
 import random
+from itertools import product, repeat
 
 import numpy as np
 
@@ -11,6 +12,19 @@ from thesis.optim.sampling import Sampler, PopulationInitializer
 from thesis.optim.objective_terms import GazeTerm, SegmentationTerm, PupilTerm, GradientHistogramTerm
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
 from thesis.entropy import joint_gradient_histogram, entropy, mutual_information_grad
+from thesis.optim.status import ProgressBar
+
+from multiprocessing import Pool, Queue, Lock
+
+
+class FastReadCounter:
+    def __init__(self):
+        self.value = 0
+        self._lock = Lock()
+
+    def increment(self):
+        with self._lock:
+            self.value += 1
 
 
 class Objective(ABC):
@@ -20,7 +34,7 @@ class Objective(ABC):
         ...
 
     @abstractmethod
-    def eval(self, params) -> List[float]:
+    def eval(self, params, parallel=False) -> List[float]:
         ...
 
     @abstractmethod
@@ -50,7 +64,8 @@ class ObfuscationObjective(Objective):
                list(map(lambda x: type(x).__name__, self.gaze_terms)) + \
                list(map(lambda x: type(x).__name__, self.pupil_terms))
 
-    def eval(self, params):
+    # @profile
+    def eval(self, params, parallel=False):
         iris_results = [[] for _ in range(len(self.iris_terms))]
         histogram_results = [[] for _ in range(len(self.histogram_terms))]
         gaze_results = [[] for _ in range(len(self.gaze_terms))]
@@ -63,10 +78,11 @@ class ObfuscationObjective(Objective):
                 for i, term in enumerate(self.iris_terms):
                     iris_results[i].append(term(sample, output))
                 hist_source, hist_filtered, hist_joint = joint_gradient_histogram(sample.image.image, output,
-                                                                                  sample.image.mask, divisions=512)
+                                                                                  sample.image.mask, divisions=16)
                 entropy_source = entropy(hist_source)
                 entropy_filtered = entropy(hist_filtered)
                 mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
+
                 for i, term in enumerate(self.histogram_terms):
                     histogram_results[i].append(term(entropy_source, entropy_filtered, mutual_information))
 
@@ -91,13 +107,17 @@ class ObfuscationObjective(Objective):
         return len(self.iris_terms) + len(self.gaze_terms)
 
 
+def id_wrap(iterator, total):
+    return iterator
+
+
 @dataclass
 class MultiObjectiveOptimizer:
     results: List
     objective: Objective
 
     @abstractmethod
-    def run(self, *, wrapper=None):
+    def run(self, wrapper=id_wrap, parallel=False):
         ...
 
     def metrics(self):
@@ -120,7 +140,7 @@ class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer):
     iterations: int
     initial_population: PopulationInitializer
 
-    def run(self, *, wrapper=None):
+    def run(self, wrapper=id_wrap, parallel=False):
         pop = list(self.initial_population)
         params = list(pop[0].keys())
 
@@ -129,12 +149,10 @@ class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer):
         m_sub_pop = m_pop // m + 1  # TODO: Check for correct solution (is it important to get len(parents)==m_pop?
 
         iterator = range(self.iterations)
-        if wrapper is not None:
-            iterator = wrapper(range(self.iterations), self.iterations)
 
         self.results = []
-        for k in iterator:
-            ys = [self.objective.eval(x) for x in pop]
+        for k in wrapper(iterator, self.iterations):
+            ys = [self.objective.eval(x, parallel) for x in pop]
             self.results.extend(list(zip(pop, [dict(zip(self.objective.metrics(), y)) for y in ys], [k] * len(pop))))
 
             parents = []
@@ -153,19 +171,31 @@ class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer):
             pop_values = [self.mutation_method.mutate(c) for c in children]
             pop_values = [np.clip(v, 0, None) for v in pop_values]
             pop = [dict(zip(params, p)) for p in pop_values]
+        bar.close()
+
+
+def for_each(args):
+    params, objective = args
+    output = objective.eval(params)
+    return params, dict(zip(objective.metrics(), output)), 0
+
+
+from tqdm import tqdm
 
 
 @dataclass
 class NaiveMultiObjectiveOptimizer(MultiObjectiveOptimizer):
     sampler: Sampler
 
-    def run(self, *, wrapper=None):
+    def run(self, wrapper=id, parallel=False):
+        # bar = bar(len(self.sampler))
         self.results = []
-        if wrapper is not None:
-            iterator = wrapper(self.sampler, len(self.sampler))
-        else:
-            iterator = self.sampler
 
-        for params in iterator:
-            output = self.objective.eval(params)
-            self.results.append((params, dict(zip(self.objective.metrics(), output)), 0))
+        args = zip(self.sampler, repeat(self.objective))
+
+        if parallel:
+            pool = Pool(processes=8)
+            self.results = list(wrapper(pool.imap(for_each, args), total=len(self.sampler)))
+            pool.close()
+        else:
+            self.results = list(map(for_each, args))

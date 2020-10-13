@@ -61,3 +61,4 @@ def progress(iterator, total):
         bar.progress(i/total)
         yield v
     bar.progress(100)
+

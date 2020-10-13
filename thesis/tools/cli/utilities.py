@@ -4,7 +4,7 @@ from typing import List
 
 import numpy as np
 import cv2
-from data import GazeDataset, SegmentationDataset, PupilDataset
+from thesis.data import GazeDataset, SegmentationDataset, PupilDataset
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn import linear_model
 
