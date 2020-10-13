@@ -50,7 +50,7 @@ sample = data['data'][index]
 
 seg = IrisSegmentation.from_dict(sample['points'])
 img = cv.imread(sample['image'], cv.IMREAD_GRAYSCALE)
-ints = 100
+ints = 20
 filtered = img.copy()
 # filtered = np.uint8(np.clip(img + np.random.uniform(-ints // 2, ints // 2, img.shape), 0, 255))
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
@@ -67,8 +67,8 @@ tmp_img = IrisImage(seg, img)
 # for x in range(0, filtered.shape[1] // s, 2):
 #     filtered[:, x * s:(x + 1) * s] += 35
 # filtered = np.uint8(np.clip(filtered, 0, 255))
-filtered = cv.GaussianBlur(filtered, (0, 0), 1)
-# filtered = cv.medianBlur(img, 55)
+# filtered = cv.GaussianBlur(filtered, (0, 0), 5)
+filtered = cv.medianBlur(img, 11)
 # filtered = cv.bilateralFilter(img, 0, 50, 80)
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
 
@@ -177,6 +177,8 @@ st.pyplot(fig)
 
 e = entropy(img_grad)
 f'Gradient entropy of original: {e}'
+e2 = entropy(fil_grad)
+f'Gradient entropy of filtered: {e2}'
 
 t = time.perf_counter()
 m2 = mutual_information_grad(img_grad, fil_grad, joint_grad)

@@ -64,7 +64,7 @@ class Quadratic(Mask):
     def get_mask(self, size):
         mask = self.empty(size)
         for x in range(0, size[0]):
-            mask[int(self(x)):, x] = 1
+            mask[int(max(self(x), 0)):, x] = 1
         return mask
 
 

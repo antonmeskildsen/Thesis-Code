@@ -64,7 +64,7 @@ def get_code(img, info):
     while height < len(code) and len(code) % height != 0:
         height += 1
     code = np.array(code).reshape((height, -1))
-    st.image([iris_img.image, polar, polar_mask * 255, code], ['regular', 'polar', 'polar_mask', 'code'])
+    st.image([iris_img.image, iris_img.mask*255, polar, polar_mask * 255, code], ['regular', 'mask', 'polar', 'polar_mask', 'code'])
     return ic
 
 
@@ -179,7 +179,7 @@ if st.checkbox('Stats'):
                 same = True
                 same_mask[i, j] = True
 
-            if same or random.random() < 0.01:  # Rate
+            if same or random.random() < 2:  # Rate
                 num_samples += 1
                 distance_matrix[i, j] = min([codes[i][angle_tests // 2].dist(cb) for cb in codes[j]])
     bar.progress(1.0)
