@@ -181,8 +181,9 @@ class SKImageIrisCodeEncoder:
         self.angular_resolution = angular_resolution
         self.radial_resolution = radial_resolution
         self.eps = eps
-        frequencies = 6
-        freqs = np.logspace(0.05, 1.0, frequencies) / 10
+        frequencies = 3
+        freqs = np.linspace(0.05, 0.3, frequencies)
+        print(freqs)
         for theta in range(0, angles):
             a = theta / angles * np.pi / 2
             for freq in freqs:
