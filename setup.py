@@ -8,10 +8,18 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         'numpy',
+        'pupilfit',
+        'scikit-image',
+        'scipy',
+        'matplotlib',
+        'streamlit',
+        'pandas',
+        'seaborn',
         'Click'
     ],
     entry_points='''
         [console_scripts]
         data=thesis.tools.cli.data_tool:data
+        filter-exp=thesis.tools.cli.filter_experiment:main
     '''
 )
