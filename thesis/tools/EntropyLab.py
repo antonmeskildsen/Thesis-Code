@@ -8,6 +8,9 @@ from collections import defaultdict
 
 import numpy as np
 import cv2 as cv
+import pandas as pd
+from skimage.filters import gabor
+from medpy.filter import smoothing
 
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -25,13 +28,13 @@ from thesis.entropy import *
 # Entropy Test Lab
 """
 
-base = '/home/anton/data/eyedata/iris'
-# base = '/Users/Anton/Desktop/data/iris'
+# base = '/home/anton/data/eyedata/iris'
+base = '/Users/Anton/Desktop/data/iris'
 
 files = glob(os.path.join(base, '*.json'))
 names = [os.path.basename(p).split('.')[0] for p in files]
 
-dataset = st.selectbox('Dataset', names)
+dataset = st.sidebar.selectbox('Dataset', names)
 
 with open(os.path.join(base, f'{dataset}.json')) as f:
     data = json.load(f)
@@ -42,8 +45,8 @@ for i, x in enumerate(data['data']):
 
 num_images = len(data['data'])
 
-user = st.selectbox('User ID', list(id_map.keys()))
-index, val = st.selectbox('Index A', id_map[user])
+user = st.sidebar.selectbox('User ID', list(id_map.keys()))
+index, val = st.sidebar.selectbox('Index A', id_map[user])
 
 sample = data['data'][index]
 
@@ -51,9 +54,15 @@ seg = IrisSegmentation.from_dict(sample['points'])
 img = cv.imread(sample['image'], cv.IMREAD_GRAYSCALE)
 ints = 100
 filtered = img.copy()
-# filtered = np.uint8(np.clip(img + np.random.uniform(-ints // 2, ints // 2, img.shape), 0, 255))
+
+radius_inner = np.sqrt(seg.inner.axes.x**2 + seg.inner.axes.y**2)
+radius_outer = np.sqrt(seg.outer.axes.x**2 + seg.outer.axes.y**2)
+
+table = pd.DataFrame([radius_inner, radius_outer], ['Radius inner', 'Radius outer'])
+st.write(table)
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
 
+st.sidebar.markdown('# Filters')
 tmp_img = IrisImage(seg, img)
 # num = 5000
 # coords = np.random.randint(0, filtered.size, num)
@@ -66,223 +75,191 @@ tmp_img = IrisImage(seg, img)
 # for x in range(0, filtered.shape[1] // s, 2):
 #     filtered[:, x * s:(x + 1) * s] += 35
 # filtered = np.uint8(np.clip(filtered, 0, 255))
-filtered = cv.GaussianBlur(filtered, (0, 0), 1)
+if st.sidebar.checkbox('Uniform noise'):
+    intensity = st.sidebar.number_input('Intensity', 0, 255, 10)
+    filtered = np.uint8(np.clip(img + np.random.uniform(-intensity // 2, intensity // 2, img.shape), 0, 255))
+
+rng = np.random.default_rng()
+if st.sidebar.checkbox('Cauchy noise'):
+    scale = st.sidebar.number_input('Scale', 0, 255, 10)
+    filtered = np.uint8(np.clip(img + rng.standard_cauchy(img.shape) * scale, 0, 255))
+
+if st.sidebar.checkbox('Gaussian filter'):
+    sigma = st.sidebar.number_input('Sigma', 0, 1000, 3)
+    filtered = cv.GaussianBlur(filtered, (0, 0), sigma)
+
+if st.sidebar.checkbox('Bilateral filter'):
+    sigma_c = st.sidebar.number_input('Sigma Color', 0, 255, 3)
+    sigma_s = st.sidebar.number_input('Sigma Space', 0, 100, 3)
+    filtered = cv.bilateralFilter(filtered, 0, sigma_c, sigma_s)
+
+if st.sidebar.checkbox('Non local means'):
+    h = st.sidebar.number_input('H (filter strength)', 0., 1000., 10.)
+    template = st.sidebar.slider('Template window size', 3, 31, 7, 2)
+    search = st.sidebar.slider('Search window size', 3, 31, 21, 2)
+    filtered = cv.fastNlMeansDenoising(filtered, h=h, templateWindowSize=template, searchWindowSize=search)
+
+if st.sidebar.checkbox('Anisotropic diffusion'):
+    iterations = st.sidebar.number_input('Iterations', 1, 10000, 1)
+    kappa = st.sidebar.number_input('Kappa', 1, 100, 50)
+    gamma = st.sidebar.number_input('Gamma', 0., 1., 0.1, 0.001)
+    fg = filtered / filtered.max()
+    filtered = np.uint8(smoothing.anisotropic_diffusion(fg, iterations, kappa, gamma, option=3) * 255)
+
 # filtered = cv.medianBlur(img, 55)
-# filtered = cv.bilateralFilter(img, 0, 50, 80)
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
 
 st.image([img, filtered])
 
-scales = st.sidebar.slider('Scales', 1, 10, 6)
-angles = st.sidebar.slider('Angles', 1, 20, 6)
-wavelength = st.sidebar.number_input('Wavelength Base', 0.0, 10.0, 0.5)
-mult = st.sidebar.number_input('Wavelength multiplier', 1.0, 5.0, 1.81)
-angular = st.sidebar.slider('Angular Resolution', 5, 100, 30, 1)
-radial = st.sidebar.slider('Radial Resolution', 2, 50, 18, 1)
-
-angle_tests = st.sidebar.number_input('Test angles', 1, 20, 7)
-spacing = st.sidebar.number_input('Angular spacing', 0, 20, 5)
-
-eps = st.sidebar.number_input('Epsilon', 0.0, 20.0, 0.01)
-
-encoder = IrisCodeEncoder(scales, angles, angular, radial, wavelength, mult, eps)
+img2 = img.copy()
+filtered2 = filtered.copy()
 
 iris_img = IrisImage(seg, img)
-pimg, _ = iris_img.to_polar(angular, radial)
-pimg = cv.equalizeHist(pimg)
-base_code = encoder.encode(iris_img)
-
 filter_img = IrisImage(seg, filtered)
-pfiltered, _ = filter_img.to_polar(angular, radial)
-pfiltered = cv.equalizeHist(pfiltered)
-filtered_code = encoder.encode(filter_img)
-
-d = base_code.dist(filtered_code)
-f'Hamming Distance: {d}'
-
-st.image([base_code.masked_image().reshape((30, -1)), filtered_code.masked_image().reshape((30, -1))])
 
 bins = 50
 div = 64
-# hist_base = np.histogram(img, div, normed=True)[0].reshape((1, -1))
-# hist_filt = np.histogram(filtered, div, normed=True)[0].reshape((1, -1))
-# hist_base = np.zeros((256 // div))
-# hist_filt = np.zeros((256 // div))
-#
-# joint = np.zeros((256 // div, 256 // div))
-# height, width = pimg.shape
-# for y in range(height):
-#     for x in range(width):
-#         joint[pimg[y, x] // div, pfiltered[y, x] // div] += 1
-#         hist_base[pimg[y, x] // div] += 1
-#         hist_filt[pfiltered[y, x] // div] += 1
-#
-# joint /= joint.sum()
-# hist_base /= hist_base.sum()
-# hist_filt /= hist_filt.sum()
 
-divi = 512
-hist_base, hist_filt, joint = joint__gabor_1d_histogram(img, filtered, iris_img.mask, divi)
+st.sidebar.markdown('# Functions')
 
-fig, ax = plt.subplots()
-ax.bar(np.arange(0, divi, 1), hist_base)
-ax.bar(np.arange(0, divi, 1), hist_filt)
-st.pyplot(fig)
+if st.sidebar.checkbox('Entropy'):
 
-fig, ax = plt.subplots()
-j2 = np.zeros((divi, divi))
-for k, v in joint.items():
-    j2[k] = v
-sns.heatmap(j2, ax=ax)
-st.pyplot(fig)
+    half_img = img.copy()
+    half_filtered = filtered.copy()
+    # half_img = cv.pyrDown(img)
+    # half_filtered = cv.pyrDown(filtered)
+    # half_img = cv.pyrDown(half_img)
+    # half_filtered = cv.pyrDown(half_filtered)
+    # half_img = cv.pyrDown(half_img)
+    # half_filtered = cv.pyrDown(half_filtered)
+    # half_img = cv.pyrDown(half_img)
+    # half_filtered = cv.pyrDown(half_filtered)
 
-# fig, ax = plt.subplots()
-# sns.heatmap(joint, ax=ax)
-# st.pyplot(fig)
+    mask = cv.resize(iris_img.mask, (half_img.shape[1], half_img.shape[0]), interpolation=cv.INTER_NEAREST)
 
-mi = mutual_information(hist_base, hist_filt, joint)
+    # st.image([img, half_img, mask * 255], ['img', 'half', 'mask'])
 
-div = 128
+    d = st.slider('Number of Divisions', 4, 512, 16)
+    t = time.perf_counter()
+    # img_grad, fil_grad, joint_grad = joint_gabor_histogram(half_img, half_filtered, mask=mask, theta=0,
+    #                                                        divisions=d)
+    img_grad, fil_grad, joint_grad = joint_gradient_histogram(half_img, half_filtered, mask, divisions=d)
+    elapsed = time.perf_counter() - t
+    f'Elapsed time for gradient histogram: {elapsed:.4f} seconds'
 
-st.image(iris_img.mask * 255)
+    eps = 10e-5
 
-d = st.slider('Number of Divisions', 4, 512, 16)
-t = time.perf_counter()
-img_grad, fil_grad, joint_grad = joint_gabor_histogram(img, filtered, mask=iris_img.mask, scale=1, theta=0, divisions=d)
-elapsed = time.perf_counter() - t
-f'Elapsed time for gradient histogram: {elapsed:.4f} seconds'
+    log_norm_img = LogNorm(vmin=img_grad.min() + eps, vmax=img_grad.max())
+    log_norm_fil = LogNorm(vmin=fil_grad.min() + eps, vmax=fil_grad.max())
+    cbar_ticks_img = [math.pow(10, i) for i in
+                      range(math.floor(math.log10(img_grad.min() + eps)), 1 + math.ceil(math.log10(img_grad.max())))]
+    cbar_ticks_fil = [math.pow(10, i) for i in
+                      range(math.floor(math.log10(fil_grad.min() + eps)), 1 + math.ceil(math.log10(fil_grad.max())))]
 
-# fig, ax = plt.subplots()
-# ax.imshow(img_grad-fil_grad)
-# st.pyplot(fig)
+    fig, ax = plt.subplots(2, 1)
+    sns.heatmap(img_grad, ax=ax[0], norm=log_norm_img, cbar_kws={'ticks': cbar_ticks_img})
+    sns.heatmap(fil_grad, ax=ax[1], norm=log_norm_fil, cbar_kws={'ticks': cbar_ticks_fil})
+    st.pyplot(fig)
 
-eps = 10e-5
+    e = entropy(img_grad)
+    f'Gradient entropy of original: {e}'
 
-joint_stuff = [(k, v) for k, v in joint_grad.items()]
-coord = joint_stuff[0][0]
-st.write(joint_stuff[0])
-st.write(img_grad[coord[:2]])
-st.write(fil_grad[coord[2:]])
+    e2 = entropy(fil_grad)
+    f'Gradient entropy of filtered: {e2}'
 
-log_norm_img = LogNorm(vmin=img_grad.min() + eps, vmax=img_grad.max())
-log_norm_fil = LogNorm(vmin=fil_grad.min() + eps, vmax=fil_grad.max())
-cbar_ticks_img = [math.pow(10, i) for i in
-                  range(math.floor(math.log10(img_grad.min() + eps)), 1 + math.ceil(math.log10(img_grad.max())))]
-cbar_ticks_fil = [math.pow(10, i) for i in
-                  range(math.floor(math.log10(fil_grad.min() + eps)), 1 + math.ceil(math.log10(fil_grad.max())))]
+    t = time.perf_counter()
+    m2 = mutual_information_grad(img_grad, fil_grad, joint_grad)
+    elapsed = time.perf_counter() - t
+    f'Elapsed time for entropy calculation: {elapsed:.4f} seconds'
 
-fig, ax = plt.subplots(2, 1)
-sns.heatmap(img_grad, ax=ax[0], norm=log_norm_img, cbar_kws={'ticks': cbar_ticks_img})
-sns.heatmap(fil_grad, ax=ax[1], norm=log_norm_fil, cbar_kws={'ticks': cbar_ticks_fil})
-st.pyplot(fig)
+    thetas = np.linspace(0, np.pi, 4)
+    base = []
+    ft = []
+    m = []
+    for theta in thetas:
+        img_grad, fil_grad, joint_grad = joint_gabor_histogram(half_img, half_filtered, mask=mask, theta=theta,
+                                                               divisions=d)
 
-# for pos, v in joint_grad.items():
-#     val_a = img_grad[pos[:2]]
-#     val_b = img_grad[pos[2:]]
-#
-#     if val_a == 0 or val_b == 0:
-#         continue
-#
-#     e_joint = v * (np.log2(v) - np.log2(val_a) - np.log2(val_b))
-#     e_single = -val_a * np.log2(val_a)
-#     if e_joint != e_single:
-#         f'Mismatch at ({pos}): {e_joint}, {e_single}'
-#         f'Values: joint: {v}, img_grad: {val_a}, fil_grad: {val_b}'
+        m.append(mutual_information(img_grad, fil_grad, joint_grad))
+        base.append(entropy(img_grad))
+        ft.append(entropy(fil_grad))
 
-e = entropy(img_grad)
-f'Gradient entropy of original: {e}'
+    f'Multiple angle MI: {np.mean(m)}'
+    f'Multiple angle base entropy: {np.mean(base)}'
+    f'Multiple angle filtered entropy: {np.mean(ft)}'
 
-e2 = entropy(fil_grad)
-f'Gradient entropy of filtered: {e2}'
+    f'Gradient mutual: {m2}'
 
-t = time.perf_counter()
-m2 = mutual_information_grad(img_grad, fil_grad, joint_grad)
-elapsed = time.perf_counter() - t
-f'Elapsed time for entropy calculation: {elapsed:.4f} seconds'
+    f'Ratio: {(e - m2) / e * 100:.2f} %'
+    f'Direct: {m2 / e}'
 
-# for a in range(512 // div):
-#     for b in range(512 // div):
-#         for c in range(512 // div):
-#             for d in range(512 // div):
-#                 v = joint_grad[a, b, c, d]
-#                 base_v = img_grad[a, b]
-#                 filt_v = fil_grad[c, d]
-#                 if v > 0 and base_v > 0 and filt_v > 0:
-#                     d = base_v * filt_v
-#                     t = np.log2(v / d)
-#                     r = v * t
-#                     m2 += r
+if st.sidebar.checkbox('Gabor responses'):
+    '# Gabor responses'
+    scale_steps = st.number_input('Scale steps', 0, 8, 0)
 
+    input_img = img.copy()
+    for _ in range(scale_steps):
+        input_img = cv.pyrDown(input_img)
 
-f'Gradient mutual: {m2}'
+    input_mask = cv.resize(iris_img.mask, (input_img.shape[1], input_img.shape[0]))
 
-f'Ratio: {(e - m2) / e * 100:.2f} %'
-f'Direct: {m2/e}'
+    f'Size: {input_img.shape}'
 
-joint = hist_base.T.dot(hist_filt)
-joint /= joint.max()
+    n_angles = st.number_input('Angles', 1, 100, 4)
+    start_angle = st.slider('Start angle', 0.0, 2 * np.pi, 0., 2 * np.pi / 100)
+    frequency = st.slider('Frequency', 0.01, 0.5, 0.3, 0.01)
+    thetas = np.linspace(start_angle, start_angle + np.pi - np.pi / n_angles, n_angles)
 
-ei = entropy(hist_base)
-f'Intensity original: {ei}'
-f'Intensity mutual: {mi}'
-f'Ratio: {(ei - mi) / ei * 100:.2f}%'
+    amplitude_image = np.zeros((*input_img.shape, 1), dtype=np.float64)
+    phase_image = np.zeros((*input_img.shape, 1), dtype=np.float64)
 
-pimg = cv.resize(pimg, (0, 0), fx=4, fy=4)
-pfiltered = cv.resize(pfiltered, (0, 0), fx=4, fy=4)
-st.image([pimg, pfiltered])
+    f'Size: {phase_image.shape}'
 
-# fig, ax = plt.subplots(1, 2)
-# ax[0].bar(range(bins), hist_base[0])
-# ax[1].bar(range(bins), hist_filt[0])
-# st.pyplot(fig)
+    input_img = input_img / 255.0
+    for theta in thetas:
+        real, imag = gabor(input_img, frequency, theta)
+        response = np.dstack((real, imag)).view(dtype=np.complex128)
+        response[input_mask == 0] = 0
+        amplitude = np.abs(response)
+        phase = np.angle(response)
 
-# st.write(joint.max())
-#
-# st.image(joint)
+        amplitude_image += amplitude
+        phase_image += phase
 
-# img = cv.GaussianBlur(img, (0, 0), 100)
-# img = cv.medianBlur(img, 201)
-#
-# scales = st.sidebar.slider('Scales', 1, 10, 6)
-# angles = st.sidebar.slider('Angles', 1, 20, 6)
-# wavelength = st.sidebar.number_input('Wavelength Base', 0.0, 10.0, 0.5)
-# mult = st.sidebar.number_input('Wavelength multiplier', 1.0, 5.0, 1.81)
-# angular = st.sidebar.slider('Angular Resolution', 5, 100, 30, 1)
-# radial = st.sidebar.slider('Radial Resolution', 2, 50, 18, 1)
-#
-# angle_tests = st.sidebar.number_input('Test angles', 1, 20, 7)
-# spacing = st.sidebar.number_input('Angular spacing', 0, 20, 5)
-#
-# eps = st.sidebar.number_input('Epsilon', 0.0, 20.0, 0.01)
-#
-# iris_img = IrisImage(seg, img)
-# encoder = IrisCodeEncoder(scales, angles, angular, radial, wavelength, mult, eps)
-# ic = encoder.encode(iris_img)
-#
-# angular = st.number_input('Angular resolution', 1, 100, 30)
-# radial = st.number_input('Radial resolution', 1, 100, 18)
-#
-# polar, pmask = iris_img.to_polar(angular, radial)
-#
-# st.image([img, polar])
-#
-# st.image(ic.masked_image().reshape((30, -1)))
-# code_img = np.uint8(ic.masked_image())
-#
-# hist = [0, 0]
-# code = np.uint8((ic.code + 1) // 2)
-# for i, val in enumerate(code):
-#     if ic.mask[i] == 1:
-#         hist[val] += 1
-#
-# total = sum(hist)
-# hist[0] /= total
-# hist[1] /= total
-#
-# st.write(hist)
-# # hist = np.histogram(code_img, 2, normed=True)[0]
-#
-# grad_entropy = - (hist[0] * np.log2(hist[0]) + hist[1] * np.log2(hist[1]))
-# f'Iris code entropy: {grad_entropy}'
+    amplitude_image -= amplitude_image.min()
+    amplitude_image /= amplitude_image.max()
+    phase_image -= phase_image.min()
+    phase_image /= phase_image.max()
 
-# maximal = np.uint8(np.random.uniform(0, 255, (radial, angular)))
+    comb = amplitude_image * phase_image
+
+    f'Size: {phase_image.shape}'
+    input_img = cv.resize(input_img, (320, 240))
+    amplitude_image = cv.resize(amplitude_image, (320, 240))
+    phase_image = cv.resize(phase_image, (320, 240))
+    comb = cv.resize(comb, (320, 240))
+    st.image([input_img, amplitude_image, phase_image, comb], ['input', 'amplitude', 'phase_image', 'comb'])
+
+if st.sidebar.checkbox('Effectiveness'):
+    '# Effectiveness'
+    divisions = st.number_input('Histogram divisions', 1, 1048576, 128)
+
+    angular = st.number_input('Angular resolution', 1, 1000, 100)
+    radial = st.number_input('Radial resolution', 1, 1000, 50)
+
+    iris_img = IrisImage(iris_img.segmentation, img2)
+    pimg, pmask = iris_img.to_polar(angular, radial)
+    iris_filtered = IrisImage(iris_img.segmentation, filtered2)
+    pfil, _ = iris_filtered.to_polar(angular, radial)
+
+    '## Polar images'
+    st.image([pimg, pfil, pmask*255], ['original', 'filtered', 'mask'])
+
+    hist_pimg, hist_pfil, hist_joint = joint_gradient_histogram(pimg, pfil, pmask, divisions=divisions)
+
+    pimg_ent = entropy(hist_pimg)
+    pfil_ent = entropy(hist_pfil)
+    joint_ent = mutual_information_grad(hist_pimg, hist_pfil, hist_joint)
+    table = pd.DataFrame([pimg_ent, pfil_ent, joint_ent, joint_ent/pimg_ent],
+                         ['Original entropy', 'Filtered entropy', 'Mutual information', 'Ratio'])
+    st.write(table)

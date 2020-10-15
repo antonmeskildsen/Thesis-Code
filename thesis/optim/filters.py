@@ -1,13 +1,25 @@
 import cv2 as cv
 import numpy as np
 from scipy import stats
+from medpy.filter import smoothing
 
 rng = np.random.default_rng()
 
 
-def bilateral_filter(img, sigma_c, sigma_s):
-    k = (int(sigma_s * 3) // 2) * 2 + 1
-    return cv.bilateralFilter(img, k, sigma_c, sigma_s)
+def mean_filter(img, size):
+    return cv.blur(img, size)
+
+
+def anisotropic_diffusion(img, kappa, gamma, iterations=1):
+    img = smoothing.anisotropic_diffusion(img, iterations, kappa, gamma)
+    return img
+
+
+def bilateral_filter(img, sigma_c, sigma_s, steps=0):
+    # k = (int(sigma_s * 3) // 2) * 2 + 1
+    for _ in range(steps):
+        img = cv.bilateralFilter(img, (0, 0), sigma_c, sigma_s)
+    return img
 
 
 def gaussian_filter(img, sigma):
