@@ -183,7 +183,7 @@ class SKImageIrisCodeEncoder:
         self.eps = eps
         frequencies = 3
         freqs = np.linspace(0.05, 0.3, frequencies)
-        print(freqs)
+        # print(freqs)
         for theta in range(0, angles):
             a = theta / angles * np.pi / 2
             for freq in freqs:

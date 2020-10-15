@@ -5,20 +5,22 @@ import eyeinfo
 import numpy as np
 import cv2 as cv
 from skimage.filters import gabor
+from sklearn.neighbors import KernelDensity
 
 from collections import defaultdict
+from itertools import product
 
 GRAD_RESOLUTION = 255 * 2 + 1
 
 
 def dx(img):
-    # return cv.Sobel(img, cv.CV_64F, 1, 0, ksize=3)
-    return cv.Scharr(img, cv.CV_64F, 1, 0)
+    return cv.Sobel(img, cv.CV_64F, 1, 0, ksize=3)
+    # return cv.Scharr(img, cv.CV_64F, 1, 0)
 
 
 def dy(img):
-    # return cv.Sobel(img, cv.CV_64F, 0, 1, ksize=3)
-    return cv.Scharr(img, cv.CV_64F, 0, 1)
+    return cv.Sobel(img, cv.CV_64F, 0, 1, ksize=3)
+    # return cv.Scharr(img, cv.CV_64F, 0, 1)
 
 
 def gradient_histogram(img, mask=None):
@@ -33,12 +35,46 @@ def gradient_histogram(img, mask=None):
     return hist
 
 
-def joint_gabor_histogram(img_a, img_b, mask=None, scale=1, theta=0, divisions=4):
+def joint_gabor_histogram(img_a, img_b, mask=None, theta=0, divisions=4):
+    # img_a = img_a / 255.0
+    # img_b = img_b / 255.5
+    #
+    # thetas = np.linspace(0, np.pi, 4)
+    #
+    # real_a = np.zeros(img_a.shape)
+    # imag_a = np.zeros(img_a.shape)
+    # real_b = np.zeros(img_a.shape)
+    # imag_b = np.zeros(img_a.shape)
+    #
+    # for theta in thetas:
+    #     sreal_a, simag_a = gabor(img_a, frequency=0.1, theta=theta, bandwidth=1)
+    #     sreal_b, simag_b = gabor(img_b, frequency=0.1, theta=theta, bandwidth=1)
+    #
+    #     real_a += sreal_a
+    #     imag_a += simag_a
+    #     real_b += sreal_a
+    #     imag_b += simag_b
+    #
+    # if mask is None:
+    #     mask = np.ones(real_a.shape, dtype=np.uint8)
+    # else:
+    #     mask = cv.resize(mask, (0, 0), fx=scale, fy=scale)
+    #
+    #     # TODO: This is not okay - used only for initial test!!
+    #     all_max = max(np.abs(real_a).max(), np.abs(imag_a).max(), np.abs(real_b).max(), np.abs(imag_b).max())
+    #     eps = 10e-6
+    #
+    # real_a = np.int16((real_a / all_max) * (divisions // 2 - eps))
+    # imag_a = np.int16((imag_a / all_max) * (divisions // 2 - eps))
+    # real_b = np.int16((real_b / all_max) * (divisions // 2 - eps))
+    # imag_b = np.int16((imag_b / all_max) * (divisions // 2 - eps))
+    #
+    # hist_a, hist_b, hist_joint = eyeinfo.joint_gradient_histogram(real_a, imag_a, real_b, imag_b, mask,
+    #                                                               divisions)
+    #
+    # return hist_a, hist_b, hist_joint
     img_a = img_a.copy()
     img_b = img_b.copy()
-
-    img_a = cv.resize(img_a, (0, 0), fx=scale, fy=scale)
-    img_b = cv.resize(img_b, (0, 0), fx=scale, fy=scale)
 
     # img_a = cv.equalizeHist(img_a)
     # img_b = cv.equalizeHist(img_b)
@@ -49,8 +85,8 @@ def joint_gabor_histogram(img_a, img_b, mask=None, scale=1, theta=0, divisions=4
     img_a = img_a / 255.0
     img_b = img_b / 255.5
 
-    real_a, imag_a = gabor(img_a, frequency=0.4, theta=theta, bandwidth=1)
-    real_b, imag_b = gabor(img_b, frequency=0.4, theta=theta, bandwidth=1)
+    real_a, imag_a = gabor(img_a, frequency=0.3, theta=theta, bandwidth=1)
+    real_b, imag_b = gabor(img_b, frequency=0.3, theta=theta, bandwidth=1)
 
     all_max = max(np.abs(real_a).max(), np.abs(imag_a).max(), np.abs(real_b).max(), np.abs(imag_b).max())
     eps = 10e-6
@@ -62,13 +98,48 @@ def joint_gabor_histogram(img_a, img_b, mask=None, scale=1, theta=0, divisions=4
 
     if mask is None:
         mask = np.ones(real_a.shape, dtype=np.uint8)
-    else:
-        mask = cv.resize(mask, (0, 0), fx=scale, fy=scale)
+    # else:
+    #     mask = cv.resize(mask, (0, 0), fx=scale, fy=scale)
 
     hist_a, hist_b, hist_joint = eyeinfo.joint_gradient_histogram(real_a, imag_a, real_b, imag_b, mask,
                                                                   divisions)
 
     return hist_a, hist_b, hist_joint
+
+
+def kde_histogram(img, mask=None):
+    img = img.copy()
+    img = cv.equalizeHist(img)
+
+    xm = dx(img).reshape(-1)
+    ym = dy(img).reshape(-1)
+
+    print(xm[110])
+
+    X = np.vstack((xm, ym)).T
+
+    kde = KernelDensity(bandwidth=5)
+
+    kde.fit(X)
+
+    size = 32
+    hist = np.zeros((size, size))
+
+    coords_x = np.arange(0, size, 1)
+    coords_y = np.arange(0, size, 1)
+    coords = np.array(list(product(coords_x, coords_y)))
+
+    print(coords.shape)
+
+    hist[coords] = kde.score(coords - size//2)
+    # hist = np.exp(hist)
+
+    print('min', hist.min(), hist.max())
+    #
+    hist -= hist.min()
+    hist /= hist.max()
+
+    return hist
 
 
 def joint_gradient_histogram(img_a, img_b, mask=None, divisions=4):
@@ -84,7 +155,8 @@ def joint_gradient_histogram(img_a, img_b, mask=None, divisions=4):
     xm_b = dx(img_b)
     ym_b = dy(img_b)
 
-    all_max = max(np.abs(xm_a).max(), np.abs(ym_a).max(), np.abs(xm_b).max(), np.abs(ym_b).max())
+    # all_max = max(np.abs(xm_a).max(), np.abs(ym_a).max(), np.abs(xm_b).max(), np.abs(ym_b).max())
+    all_max = 1024
 
     eps = 10e-6
     xm_a = np.int16(xm_a / all_max * (divisions // 2 - eps))
