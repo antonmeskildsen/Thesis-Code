@@ -129,12 +129,12 @@ def kde_histogram(img, mask=None):
     coords_y = np.arange(0, size, 1)
     coords = np.array(list(product(coords_x, coords_y)))
 
-    print(coords.shape)
+    # print(coords.shape)
 
     hist[coords] = kde.score(coords - size//2)
     # hist = np.exp(hist)
 
-    print('min', hist.min(), hist.max())
+    # print('min', hist.min(), hist.max())
     #
     hist -= hist.min()
     hist /= hist.max()

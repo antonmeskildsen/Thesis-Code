@@ -88,8 +88,9 @@ class IrisImage:
             angle_steps = np.linspace(start_angle, start_angle + 2 * np.pi, angular_resolution)
             for i, theta in enumerate(angle_steps):
                 start, stop = self.segmentation.intersect_angle(theta)
-                x_coord, y_coord = start.linear_interpolation(stop, radial_resolution)
-                for j, (x, y) in enumerate(zip(x_coord, y_coord)):
+                margin = radial_resolution//4
+                x_coord, y_coord = start.linear_interpolation(stop, radial_resolution+margin*2)
+                for j, (x, y) in enumerate(zip(x_coord[margin:][:-margin], y_coord[margin:][:-margin])):
                     if x < 0 or y < 0 or x >= self.image.shape[1] or y >= self.image.shape[0]:
                         continue
                     output[j, i] = self.image[int(y), int(x)]
@@ -177,32 +178,51 @@ class SKImageIrisCodeEncoder:
                  angular_resolution=20,
                  radial_resolution=10,
                  eps=0.01):
-        self.kernels = []
         self.angular_resolution = angular_resolution
         self.radial_resolution = radial_resolution
         self.eps = eps
-        frequencies = 3
-        freqs = np.linspace(0.05, 0.3, frequencies)
-        # print(freqs)
+        self.kernels = []
         for theta in range(0, angles):
             a = theta / angles * np.pi / 2
-            for freq in freqs:
-                kernel = gabor_kernel(freq, a, bandwidth=1)
-                self.kernels.append(kernel)
+            kernel = gabor_kernel(1 / 3, a, bandwidth=1)
+            self.kernels.append(kernel)
 
     def encode(self, image, start_angle=0):
         polar, polar_mask = image.to_polar(self.angular_resolution, self.radial_resolution, start_angle)
-        polar = cv.equalizeHist(polar)
-        polar = np.float64(polar)
+        # polar = cv.equalizeHist(polar)
+        polar = np.float64(polar) / 255
+
+        pyramid = [(polar, polar_mask)]
+        scales = 6
+        for _ in range(scales):
+            p_next = cv.pyrDown(polar)
+            m_next = cv.resize(polar_mask, (p_next.shape[1], p_next.shape[0]), cv.INTER_NEAREST)
+            pyramid.append((p_next, m_next))
+
         res = []
         mask = []
         for k in self.kernels:
-            f = ndi.convolve(polar, np.imag(k), mode='wrap')
-            m = np.zeros(f.shape, np.uint8)
-            m[np.abs(f) < self.eps] = 1
-            f = np.sign(f)
-            m[polar_mask == 0] = 1
-            res.extend(f.reshape(-1))
-            mask.extend(m.reshape(-1))
+            for pl, pmask in pyramid:
+                # f_real = ndi.convolve(pl, k.real, mode='wrap')
+                # f_imag = ndi.convolve(pl, k.imag, mode='wrap')
+                f_real = cv.filter2D(pl, cv.CV_64F, k.real)
+                f_imag = cv.filter2D(pl, cv.CV_64F, k.imag)
+                m_real = np.zeros(f_real.shape, np.uint8)
+
+                f_complex = np.dstack((f_real, f_imag)).view(dtype=np.complex128)[:, :, 0]
+                # print(f_complex.shape)
+
+                m_real[np.abs(f_complex) < self.eps] = 1
+                f_real = np.sign(f_real)
+                m_real[pmask == 0] = 1
+                res.extend(f_real.reshape(-1))
+                mask.extend(m_real.reshape(-1))
+
+                m_imag = np.zeros(f_imag.shape, np.uint8)
+                m_imag[np.abs(f_complex) < self.eps] = 1
+                f_imag = np.sign(f_imag)
+                m_imag[pmask == 0] = 1
+                res.extend(f_imag.reshape(-1))
+                mask.extend(m_imag.reshape(-1))
 
         return IrisCode(np.array(res), np.array(mask))

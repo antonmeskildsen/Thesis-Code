@@ -42,7 +42,7 @@ radial = st.sidebar.slider('Radial Resolution', 2, 50, 18, 1)
 angle_tests = st.sidebar.number_input('Test angles', 1, 20, 7)
 spacing = st.sidebar.number_input('Angular spacing', 0, 20, 5)
 
-eps = st.sidebar.number_input('Epsilon', 0.0, 20.0, 0.01)
+eps = st.sidebar.number_input('Epsilon', 0.0001, 20.0, 0.001, 0.0001)
 
 # encoder = IrisCodeEncoder(scales, angles, angular, radial, wavelength, mult, eps)
 encoder = SKImageIrisCodeEncoder(angles, angular, radial, eps)
@@ -71,6 +71,7 @@ def get_code(img, info):
 def create_code(item, angles=1, angular_spacing=5):
     seg = IrisSegmentation.from_dict(item['points'])
     img = cv.imread(item['image'], cv.IMREAD_GRAYSCALE)
+    # img = np.uint8(np.random.uniform(0, 255, img.shape))
     iris_img = IrisImage(seg, img)
     if angles == 1:
         ic = encoder.encode(iris_img)
@@ -118,15 +119,17 @@ num_images = len(data['data'])
 # index = st.number_input(f'Image index (0-{num_images-1})', min_value=0, max_value=num_images-1, value=0)
 
 if st.checkbox('Compare'):
-    user1 = st.selectbox('User ID', list(id_map.keys()))
+    user1 = st.selectbox('User ID', sorted(list(id_map.keys())))
     index, val = st.selectbox('Index A', id_map[user1])
-    user2 = st.selectbox('User ID 2', list(id_map.keys()))
+    user2 = st.selectbox('User ID 2', sorted(list(id_map.keys())))
     index2, val2 = st.selectbox('Index B', id_map[user2])
 
     info = data['data'][index]
     info2 = data['data'][index2]
     img = cv.imread(info['image'], cv.IMREAD_GRAYSCALE)
     img2 = cv.imread(info2['image'], cv.IMREAD_GRAYSCALE)
+
+    # img = np.uint8(np.random.uniform(0, 255, img2.shape))
     # img2 = np.uint8(np.random.uniform(0, 255, img2.shape))
 
     if img is None or img2 is None:
