@@ -1,0 +1,23 @@
+polar_resolution:
+  angular: 200
+  radial: 20
+
+constructor_args:
+  GradientEntropy:
+    histogram_divisions: 16
+
+  GaborEntropy:
+    scales: 5
+    angles_per_scale: 3
+    histogram_divisions: 16
+
+  GazeAccuracy: {}
+
+  PupilDetectionError:
+    detectors:
+      - ElseDetector
+
+  ImageSimilarity:
+    angles: 6
+    scales: 6
+    eps: 0.001

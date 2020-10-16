@@ -13,7 +13,7 @@ from thesis.segmentation import IrisImage
 from thesis.data import SegmentationDataset, GazeDataset, PupilDataset
 from thesis.optim.pareto import dominates
 from thesis.optim.sampling import Sampler, PopulationInitializer
-from thesis.optim.objective_terms import GazeTerm, SegmentationTerm, PupilTerm, GradientHistogramTerm
+from thesis.optim.metrics import IrisMetric, GazeMetric, PupilMetric, Logger
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
 from thesis.entropy import joint_gradient_histogram, entropy, mutual_information_grad, joint_gabor_histogram
 from thesis.optim.status import ProgressBar
@@ -53,85 +53,51 @@ class ObfuscationObjective(Objective):
     gaze_datasets: List[GazeDataset]
     pupil_datasets: List[PupilDataset]
 
-    iris_terms: List[SegmentationTerm]
-    histogram_terms: List[GradientHistogramTerm]
-    gabor_terms: List[GaborTerm]
-    gaze_terms: List[GazeTerm]
-    pupil_terms: List[PupilTerm]
+    iris_terms: List[IrisMetric]
+    gaze_terms: List[GazeMetric]
+    pupil_terms: List[PupilMetric]
 
     iris_samples: int
     gaze_samples: int
     pupil_samples: int
 
     def metrics(self) -> List[str]:
-        return list(map(lambda x: type(x).__name__, self.iris_terms)) + \
-               list(map(lambda x: type(x).__name__, self.histogram_terms)) + \
-               list(map(lambda x: type(x).__name__, self.gaze_terms)) + \
-               list(map(lambda x: type(x).__name__, self.pupil_terms))
+        return self._metrics
 
     # @profile
     def eval(self, params):
-        iris_results = [[] for _ in range(len(self.iris_terms))]
-        histogram_results = [[] for _ in range(len(self.histogram_terms))]
-        gaze_results = [[] for _ in range(len(self.gaze_terms))]
-        pupil_results = [[] for _ in range(len(self.pupil_terms))]
+        results = Logger()
 
         samples_per_set = self.iris_samples // len(self.iris_datasets)
         for dataset in self.iris_datasets:
             for sample in random.sample(dataset.samples, samples_per_set):
                 output = self.filter(sample.image.image, **params)
-                for i, term in enumerate(self.iris_terms):
-                    iris_results[i].append(term(sample, output))
 
                 angular, radial = 200, 20  # Should be: 1000, 100
-
                 polar, mask = sample.image.to_polar(angular, radial)
                 ii = IrisImage(sample.image.segmentation, output)
                 polar_filtered, _ = ii.to_polar(angular, radial)
 
-                divisions = 16
-
-                pyramid = [(polar, polar_filtered, mask)]
-                scales = 6
-                num_angles = 6
-                angles = np.linspace(0, np.pi, num_angles)
-                for _ in range(scales):
-                    for theta in angles:
-                        hist_source, hist_filtered, hist_joint = joint_gabor_histogram(polar, polar_filtered, mask, theta, divisions)
-                    polar = cv.pyrDown(polar)
-                    polar_filtered = cv.pyrDown(polar_filtered)
-                    mask = cv.resize(mask, polar.shape, interpolation=cv.INTER_NEAREST)
-                    pyramid.append((polar, polar_filtered, mask))
-
-
-
-
-
-                hist_source, hist_filtered, hist_joint = joint_gradient_histogram(polar, polar_filtered, mask,
-                                                                                  divisions)
-                entropy_source = entropy(hist_source)
-                entropy_filtered = entropy(hist_filtered)
-                mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
-
-                for i, term in enumerate(self.histogram_terms):
-                    histogram_results[i].append(term(entropy_source, entropy_filtered, mutual_information))
+                for i, metric in enumerate(self.iris_terms):
+                    metric.log(results, polar, polar_filtered, mask)
 
         samples_per_set = self.gaze_samples // len(self.gaze_datasets)
         for dataset in self.gaze_datasets:
             for sample in random.sample(dataset.test_samples, samples_per_set):
                 output = self.filter(sample.image, **params)
-                for i, term in enumerate(self.gaze_terms):
-                    gaze_results[i].append(term(dataset.model, sample, output))
+                for i, metric in enumerate(self.gaze_terms):
+                    metric.log(results, dataset.model, sample, output)
 
         samples_per_set = self.pupil_samples // len(self.pupil_datasets)
         for dataset in self.pupil_datasets:
             for sample in random.sample(dataset.samples, samples_per_set):
                 output = self.filter(sample.image, **params)
-                for i, term in enumerate(self.pupil_terms):
-                    pupil_results[i].append(term(sample, output))
+                for i, metric in enumerate(self.pupil_terms):
+                    metric.log(results, sample, output)
 
-        return list(map(np.mean, iris_results)) + list(map(np.mean, histogram_results)) + list(
-            map(np.mean, gaze_results)) + list(map(np.mean, pupil_results))
+        self._metrics = results.columns()
+
+        return results.means()
 
     def output_dimensions(self):
         return len(self.iris_terms) + len(self.gaze_terms)

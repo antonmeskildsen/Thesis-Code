@@ -23,11 +23,8 @@ from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, Populatio
 from thesis.optim import sampling
 from thesis.optim.filters import bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, salt_and_pepper, \
     cauchy_noise
-from thesis.optim.objective_terms import AbsoluteGradientEntropy, RelativeGradientEntropy, AbsoluteMutualInformation, \
-    RelativeMutualInformation, AbsoluteGazeAccuracy, RelativeGazeAccuracy, IrisCodeSimilarity, ImageSimilarity, \
-    AbsolutePupilDistanceBaseAlgorithm, AbsolutePupilDistanceElse, AbsolutePupilDistanceExcuse, \
-    RelativePupilDistanceBaseAlgorithm, RelativePupilDistanceElse, RelativePupilDistanceExcuse, \
-    AbsoluteOriginalGradientEntropy
+from thesis.optim.metrics import GradientEntropy, GaborEntropy, ImageSimilarity, GazeAccuracy, PupilDetectionError
+from thesis.optim import metrics
 from thesis.optim.population import TruncationSelection, TournamentSelection, UniformCrossover, GaussianMutation
 
 st.title('Obfuscation Experiment')
@@ -83,40 +80,22 @@ st.sidebar.write("""
 ## Metrics and results
 """)
 
-iris_metrics = st.sidebar.multiselect('Iris metrics',
-                                      (IrisCodeSimilarity,),
-                                      default=(IrisCodeSimilarity,), format_func=type_name)
-histogram_metrics = st.sidebar.multiselect('Histogram metrics',
-                                           (
-                                               AbsoluteGradientEntropy, AbsoluteOriginalGradientEntropy,
-                                               RelativeGradientEntropy, AbsoluteMutualInformation,
-                                               RelativeMutualInformation),
-                                           default=(AbsoluteGradientEntropy, AbsoluteOriginalGradientEntropy,
-                                                    RelativeGradientEntropy, AbsoluteMutualInformation,
-                                                    RelativeMutualInformation), format_func=type_name)
-gaze_metrics = st.sidebar.multiselect('Gaze metrics', (AbsoluteGazeAccuracy, RelativeGazeAccuracy),
-                                      default=(AbsoluteGazeAccuracy, RelativeGazeAccuracy), format_func=type_name)
-pupil_metrics = st.sidebar.multiselect('Pupil metrics',
-                                       (AbsolutePupilDistanceBaseAlgorithm, AbsolutePupilDistanceElse,
-                                        AbsolutePupilDistanceExcuse, RelativePupilDistanceBaseAlgorithm,
-                                        RelativePupilDistanceElse, RelativePupilDistanceExcuse),
-                                       default=(AbsolutePupilDistanceBaseAlgorithm, AbsolutePupilDistanceElse,
-                                                AbsolutePupilDistanceExcuse, RelativePupilDistanceBaseAlgorithm,
-                                                RelativePupilDistanceElse, RelativePupilDistanceExcuse),
-                                       format_func=type_name)
+config_metrics = file_select('Metrics configuration file', 'configs/metrics/*.yaml')
+with open(config_metrics) as config_metrics:
+    config_metrics = yaml.safe_load(config_metrics)
 
-iris_terms = list(map(lambda x: x(), iris_metrics))
-histogram_terms = list(map(lambda x: x(), histogram_metrics))
-gaze_terms = list(map(lambda x: x(), gaze_metrics))
-pupil_terms = list(map(lambda x: x(), pupil_metrics))
+constructor_args = config_metrics['constructor_args']
 
-filters = st.sidebar.multiselect('Filter types',
-                                 (gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper,
-                                  cauchy_noise),
-                                 default=(
-                                     gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper,
-                                     cauchy_noise),
-                                 format_func=type_name)
+possible_iris_metrics = (GradientEntropy, GaborEntropy, ImageSimilarity)
+# iris_metrics_mask = [st.sidebar.checkbox(m.__name__) for m in possible_iris_metrics]
+iris_metrics = [T(**constructor_args[T.__name__]) for T in possible_iris_metrics if st.sidebar.checkbox(T.__name__)]
+gaze_metrics = [GazeAccuracy()] if st.sidebar.checkbox('Gaze metrics') else []
+pupil_metrics = [PupilDetectionError(**constructor_args['PupilDetectionError'])] if st.sidebar.checkbox(
+    'Pupil metrics') else []
+
+st.sidebar.markdown('## Filter selection')
+filters = [f for f in (gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper,
+                       cauchy_noise) if st.sidebar.checkbox(f.__name__)]
 
 st.sidebar.write(
     """
@@ -153,13 +132,12 @@ if method == NaiveMultiObjectiveOptimizer:
     sampling = st.sidebar.selectbox('Sampling technique', (GridSearch, UniformSampler), format_func=type_name)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, histogram_terms, gaze_terms,
-                                         pupil_terms,
-                                         iris_samples, gaze_samples, pupil_samples)
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_metrics, gaze_metrics,
+                                         pupil_metrics, iris_samples, gaze_samples, pupil_samples)
         params, generators = json_to_strategy(config[f.__name__])
-        for p, g in zip(params, generators):
-            f'Param: {p}'
-            st.write(g)
+        # for p, g in zip(params, generators):
+        #     f'Param: {p}'
+        #     st.write(g)
         sampler: Sampler = sampling(params, generators)
         projected_iterations += len(sampler)
         optimizers[f.__name__] = method([], objective, sampler)
@@ -182,9 +160,8 @@ elif method == PopulationMultiObjectiveOptimizer:
     projected_iterations = iterations * pop_num * len(filters)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, histogram_terms, gaze_terms,
-                                         pupil_terms,
-                                         iris_samples, gaze_samples, pupil_samples)
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_metrics, gaze_metrics,
+                                         pupil_metrics, iris_samples, gaze_samples, pupil_samples)
         init = PopulationInitializer(*make_strategy(config[f.__name__], pop_num))
 
         sigmas = []
@@ -213,7 +190,6 @@ if st.button('Export'):
         'strategy_config': config_file.name,
         'metrics': {
             'iris_metrics': list(map(type_name, iris_metrics)),
-            'histogram_metrics': list(map(type_name, histogram_metrics)),
             'gaze_metrics': list(map(type_name, gaze_metrics)),
             'pupil_metrics': list(map(type_name, pupil_metrics))
         },
@@ -278,18 +254,19 @@ if st.button('Start experiment'):
         metrics = pd.DataFrame(metrics_df)
         st.write(metrics)
 
-        c = alt.Chart(metrics).mark_point().encode(
-            x=gaze_metrics[0].__name__,
-            y=iris_metrics[0].__name__,
-            color='k:Q'
-        ).interactive()
+        if len(gaze_metrics) > 0 and len(iris_metrics) > 0:
+            c = alt.Chart(metrics).mark_point().encode(
+                x=gaze_metrics[0].__name__,
+                y=iris_metrics[0].__name__,
+                color='k:Q'
+            ).interactive()
 
-        c = c + alt.Chart(metrics).mark_line().encode(
-            x=gaze_metrics[0].__name__,
-            y=iris_metrics[0].__name__,
-            color='k:Q'
-        ).transform_filter(alt.datum.pareto).interactive()
-        st.altair_chart(c, use_container_width=True)
+            c = c + alt.Chart(metrics).mark_line().encode(
+                x=gaze_metrics[0].__name__,
+                y=iris_metrics[0].__name__,
+                color='k:Q'
+            ).transform_filter(alt.datum.pareto).interactive()
+            st.altair_chart(c, use_container_width=True)
 
     if should_export:
         with open(new_path, 'w') as file:

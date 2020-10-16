@@ -52,7 +52,8 @@ class GazeDataset:
             calibration_samples = list(map(lambda d: GazeImage.from_json(path, d), data['calibration']))
             test_samples = list(map(lambda d: GazeImage.from_json(path, d), data['test']))
 
-            model = BasicGaze(pupil_detector=fit_else_ref)
+            model = BasicGaze(data['screen']['res-x'], data['screen']['res-y'], data['fov'],
+                              pupil_detector=fit_else_ref)
             images = [s.image for s in calibration_samples]
             gaze_positions = [s.screen_position for s in calibration_samples]
             model.calibrate(images, gaze_positions)

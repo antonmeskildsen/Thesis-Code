@@ -112,6 +112,8 @@ def find_glints(gray, center, *,
 
 def normalize_coordinates(coordinates, height, width):
     coordinates = np.float64(coordinates)
+    height = float(height)
+    width = float(width)
     coordinates[:, 0] /= height
     coordinates[:, 1] /= width
     return coordinates

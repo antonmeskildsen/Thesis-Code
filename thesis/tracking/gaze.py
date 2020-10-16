@@ -107,7 +107,9 @@ def hom(points):
 
 
 class BasicGaze(GazeModel):
-    def __init__(self, glint_args=None, model: Pipeline = None, pupil_detector=features.pupil_detector):
+    def __init__(self, screen_width: int, screen_height: int, fov: float, glint_args=None, model: Pipeline = None,
+                 pupil_detector=features.pupil_detector):
+        super().__init__(screen_width, screen_height, fov)
         if glint_args is None:
             self.glint_args = {}
         else:
@@ -118,7 +120,6 @@ class BasicGaze(GazeModel):
                 ('model', LinearRegression())
             ])
 
-        super().__init__()
         self.model = model
         self.pupil_detector = pupil_detector
 

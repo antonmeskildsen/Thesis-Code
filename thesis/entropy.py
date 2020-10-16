@@ -4,7 +4,7 @@ import eyeinfo
 
 import numpy as np
 import cv2 as cv
-from skimage.filters import gabor
+from skimage.filters import gabor, gabor_kernel
 from sklearn.neighbors import KernelDensity
 
 from collections import defaultdict
@@ -42,8 +42,15 @@ def joint_gabor_histogram(img_a, img_b, mask=None, theta=0, divisions=4):
     img_a = img_a / 255.0
     img_b = img_b / 255.5
 
-    real_a, imag_a = gabor(img_a, frequency=0.3, theta=theta, bandwidth=1)
-    real_b, imag_b = gabor(img_b, frequency=0.3, theta=theta, bandwidth=1)
+    kernel = gabor_kernel(frequency=0.3, theta=theta, bandwidth=1)
+
+    real_a = cv.filter2D(img_a, cv.CV_64F, kernel.real)
+    imag_a = cv.filter2D(img_a, cv.CV_64F, kernel.imag)
+    real_b = cv.filter2D(img_b, cv.CV_64F, kernel.real)
+    imag_b = cv.filter2D(img_b, cv.CV_64F, kernel.imag)
+
+    # real_a, imag_a = gabor(img_a, frequency=0.3, theta=theta, bandwidth=1)
+    # real_b, imag_b = gabor(img_b, frequency=0.3, theta=theta, bandwidth=1)
 
     all_max = max(np.abs(real_a).max(), np.abs(imag_a).max(), np.abs(real_b).max(), np.abs(imag_b).max())
     eps = 10e-6
