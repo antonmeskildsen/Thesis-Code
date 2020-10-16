@@ -17,7 +17,7 @@ from data import GazeDataset, PupilDataset, SegmentationDataset
 from optim.multi_objective import MultiObjectiveOptimizer, NaiveMultiObjectiveOptimizer, \
     PopulationMultiObjectiveOptimizer, ObfuscationObjective
 
-from tools.st_utils import file_select, type_name, json_to_strategy, progress, file_select_sidebar
+from tools.st_utils import file_select, type_name, obj_type_name, json_to_strategy, progress, file_select_sidebar
 from tools.cli.utilities import load_iris_data, load_gaze_data, load_pupil_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, PopulationInitializer
 from thesis.optim import sampling
@@ -80,8 +80,8 @@ st.sidebar.write("""
 ## Metrics and results
 """)
 
-config_metrics = file_select('Metrics configuration file', 'configs/metrics/*.yaml')
-with open(config_metrics) as config_metrics:
+config_metrics_file = file_select('Metrics configuration file', 'configs/metrics/*.yaml')
+with open(config_metrics_file) as config_metrics:
     config_metrics = yaml.safe_load(config_metrics)
 
 constructor_args = config_metrics['constructor_args']
@@ -101,6 +101,10 @@ st.sidebar.write(
     """
     ## Optimizer setup
     """)
+
+angular = st.sidebar.number_input('Angular resolution', 1, 2000, 200)
+radial = st.sidebar.number_input('Radial resolution', 1, 1000, 20)
+
 method = st.sidebar.selectbox('Type', (NaiveMultiObjectiveOptimizer, PopulationMultiObjectiveOptimizer),
                               format_func=lambda x: x.__name__, index=0)
 
@@ -133,7 +137,7 @@ if method == NaiveMultiObjectiveOptimizer:
 
     for f in filters:
         objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_metrics, gaze_metrics,
-                                         pupil_metrics, iris_samples, gaze_samples, pupil_samples)
+                                         pupil_metrics, iris_samples, gaze_samples, pupil_samples, (radial, angular))
         params, generators = json_to_strategy(config[f.__name__])
         # for p, g in zip(params, generators):
         #     f'Param: {p}'
@@ -161,7 +165,7 @@ elif method == PopulationMultiObjectiveOptimizer:
 
     for f in filters:
         objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_metrics, gaze_metrics,
-                                         pupil_metrics, iris_samples, gaze_samples, pupil_samples)
+                                         pupil_metrics, iris_samples, gaze_samples, pupil_samples, (radial, angular))
         init = PopulationInitializer(*make_strategy(config[f.__name__], pop_num))
 
         sigmas = []
@@ -188,10 +192,11 @@ if st.button('Export'):
     data = {
         'data_config': config_main,
         'strategy_config': config_file.name,
+        'metrics_config': config_metrics_file,
         'metrics': {
-            'iris_metrics': list(map(type_name, iris_metrics)),
-            'gaze_metrics': list(map(type_name, gaze_metrics)),
-            'pupil_metrics': list(map(type_name, pupil_metrics))
+            'iris_metrics': list(map(obj_type_name, iris_metrics)),
+            'gaze_metrics': list(map(obj_type_name, gaze_metrics)),
+            'pupil_metrics': list(map(obj_type_name, pupil_metrics))
         },
         'samples': {
             'iris': int(iris_samples),
@@ -199,7 +204,8 @@ if st.button('Export'):
             'pupil': int(pupil_samples)
         },
         'filters': list(map(type_name, filters)),
-        'method': type_name(method)
+        'method': type_name(method),
+        'polar_resolution': (radial, angular)
     }
 
     with open(os.path.join('configs', 'filter_experiment', f'{name}.yaml'), 'w') as file:

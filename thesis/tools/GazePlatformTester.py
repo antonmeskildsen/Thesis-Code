@@ -16,7 +16,7 @@ from thesis.tracking.gaze import BasicGaze
 from tools.cli.utilities import load_json, load_images
 from thesis.optim.filters import uniform_noise
 from thesis.deepeye import deepeye
-from thesis.tools.st_utils import create_deepeye_func, fit_else_ref
+from thesis.tools.st_utils import create_deepeye_func, fit_else_ref, fit_excuse_ref
 
 from pupilfit import fit_else, fit_excuse
 
@@ -28,7 +28,7 @@ import tensorflow as tf
 tf.reset_default_graph()
 
 st.info('Loading Tensorflow model into memory')
-# deepeye_ref = create_deepeye_func()
+deepeye_ref = create_deepeye_func()
 
 
 st.title('Gaze experiments')
@@ -70,7 +70,7 @@ if st.sidebar.checkbox('Bilateral filter'):
     idx = st.number_input('Image', 0, len(images), 0)
     st.image(images[int(idx)], 'Sample')
 
-pupil_detector = st.selectbox('Pupil method', (fit_else_ref, features.pupil_detector),
+pupil_detector = st.selectbox('Pupil method', (fit_else_ref, features.pupil_detector, deepeye_ref, fit_excuse_ref),
                               format_func=lambda x: x.__name__)
 
 st.sidebar.markdown("# Filter")
@@ -107,7 +107,7 @@ def show(img, **kwargs):
 img = st.number_input('img', 0, 1000, 5)
 thresh = st.slider('threshold', 0, 255, 184)
 radius = st.slider('radius', 0, 500, 80)
-area = st.slider('min_area', 0, 50, 20)
+area = st.slider('min_area', 0, 100, 20)
 ratio = st.slider('min_ratio', 0., 1., 0.3)
 
 with st.spinner('Wait...'):
@@ -145,13 +145,15 @@ if st.sidebar.checkbox('Calc gaze'):
     test_X = images[n_cal:]
     test_y = gaze_positions[n_cal:]
 
-    model = BasicGaze(dict(threshold=thresh, radius=radius, max_area=area, min_ratio=ratio), model, pupil_detector)
+    model = BasicGaze(screen_width=0, screen_height=0, fov=0,
+                      glint_args=dict(threshold=thresh, radius=radius, max_area=area, min_ratio=ratio), model=model,
+                      pupil_detector=pupil_detector)
     model.calibrate(train_X, train_y)
 
     st.sidebar.markdown('# Field of view calc')
-    screen_dist = st.sidebar.number_input('Distance to screen (cm)', 1, 1000, 60)
-    screen_width = st.sidebar.number_input('Screen width (cm)', 1, 1000, 40)
-    fov = np.arcsin(screen_width/(2*screen_dist))*2 / (2*np.pi) * 360
+    screen_dist = st.sidebar.number_input('Distance to screen (cm)', 1., 1000., 60., 0.1)
+    screen_width = st.sidebar.number_input('Screen width (cm)', 1., 1000., 40., 0.1)
+    fov = np.arcsin(screen_width / (2 * screen_dist)) * 2 / (2 * np.pi) * 360
     st.sidebar.markdown(f'FOV: {fov}')
 
     e = np.abs(err(test_X, test_y)).mean(axis=0)

@@ -61,10 +61,11 @@ class ObfuscationObjective(Objective):
     gaze_samples: int
     pupil_samples: int
 
+    polar_image_resolution: (int, int)
+
     def metrics(self) -> List[str]:
         return self._metrics
 
-    # @profile
     def eval(self, params):
         results = Logger()
 
@@ -73,7 +74,7 @@ class ObfuscationObjective(Objective):
             for sample in random.sample(dataset.samples, samples_per_set):
                 output = self.filter(sample.image.image, **params)
 
-                angular, radial = 200, 20  # Should be: 1000, 100
+                radial, angular = self.polar_image_resolution  # Should be: 1000, 100
                 polar, mask = sample.image.to_polar(angular, radial)
                 ii = IrisImage(sample.image.segmentation, output)
                 polar_filtered, _ = ii.to_polar(angular, radial)
@@ -189,8 +190,9 @@ class NaiveMultiObjectiveOptimizer(MultiObjectiveOptimizer):
         args = zip(self.sampler, repeat(self.objective))
 
         if parallel:
-            pool = Pool(processes=8)
+            pool = Pool()
             self.results = list(wrapper(pool.imap(for_each, args), total=len(self.sampler)))
             pool.close()
+            pool.join()
         else:
             self.results = list(wrapper(map(for_each, args), total=len(self.sampler)))
