@@ -5,13 +5,17 @@ import random
 from itertools import product, repeat
 
 import numpy as np
+import cv2 as cv
 
+import eyeinfo
+
+from thesis.segmentation import IrisImage
 from thesis.data import SegmentationDataset, GazeDataset, PupilDataset
 from thesis.optim.pareto import dominates
 from thesis.optim.sampling import Sampler, PopulationInitializer
 from thesis.optim.objective_terms import GazeTerm, SegmentationTerm, PupilTerm, GradientHistogramTerm
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
-from thesis.entropy import joint_gradient_histogram, entropy, mutual_information_grad
+from thesis.entropy import joint_gradient_histogram, entropy, mutual_information_grad, joint_gabor_histogram
 from thesis.optim.status import ProgressBar
 
 from multiprocessing import Pool, Queue, Lock
@@ -51,6 +55,7 @@ class ObfuscationObjective(Objective):
 
     iris_terms: List[SegmentationTerm]
     histogram_terms: List[GradientHistogramTerm]
+    gabor_terms: List[GaborTerm]
     gaze_terms: List[GazeTerm]
     pupil_terms: List[PupilTerm]
 
@@ -65,7 +70,7 @@ class ObfuscationObjective(Objective):
                list(map(lambda x: type(x).__name__, self.pupil_terms))
 
     # @profile
-    def eval(self, params, parallel=False):
+    def eval(self, params):
         iris_results = [[] for _ in range(len(self.iris_terms))]
         histogram_results = [[] for _ in range(len(self.histogram_terms))]
         gaze_results = [[] for _ in range(len(self.gaze_terms))]
@@ -77,8 +82,33 @@ class ObfuscationObjective(Objective):
                 output = self.filter(sample.image.image, **params)
                 for i, term in enumerate(self.iris_terms):
                     iris_results[i].append(term(sample, output))
-                hist_source, hist_filtered, hist_joint = joint_gradient_histogram(sample.image.image, output,
-                                                                                  sample.image.mask, divisions=16)
+
+                angular, radial = 200, 20  # Should be: 1000, 100
+
+                polar, mask = sample.image.to_polar(angular, radial)
+                ii = IrisImage(sample.image.segmentation, output)
+                polar_filtered, _ = ii.to_polar(angular, radial)
+
+                divisions = 16
+
+                pyramid = [(polar, polar_filtered, mask)]
+                scales = 6
+                num_angles = 6
+                angles = np.linspace(0, np.pi, num_angles)
+                for _ in range(scales):
+                    for theta in angles:
+                        hist_source, hist_filtered, hist_joint = joint_gabor_histogram(polar, polar_filtered, mask, theta, divisions)
+                    polar = cv.pyrDown(polar)
+                    polar_filtered = cv.pyrDown(polar_filtered)
+                    mask = cv.resize(mask, polar.shape, interpolation=cv.INTER_NEAREST)
+                    pyramid.append((polar, polar_filtered, mask))
+
+
+
+
+
+                hist_source, hist_filtered, hist_joint = joint_gradient_histogram(polar, polar_filtered, mask,
+                                                                                  divisions)
                 entropy_source = entropy(hist_source)
                 entropy_filtered = entropy(hist_filtered)
                 mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
@@ -171,7 +201,6 @@ class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer):
             pop_values = [self.mutation_method.mutate(c) for c in children]
             pop_values = [np.clip(v, 0, None) for v in pop_values]
             pop = [dict(zip(params, p)) for p in pop_values]
-        bar.close()
 
 
 def for_each(args):
@@ -198,4 +227,4 @@ class NaiveMultiObjectiveOptimizer(MultiObjectiveOptimizer):
             self.results = list(wrapper(pool.imap(for_each, args), total=len(self.sampler)))
             pool.close()
         else:
-            self.results = list(map(for_each, args))
+            self.results = list(wrapper(map(for_each, args), total=len(self.sampler)))

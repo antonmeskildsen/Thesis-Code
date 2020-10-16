@@ -36,51 +36,8 @@ def gradient_histogram(img, mask=None):
 
 
 def joint_gabor_histogram(img_a, img_b, mask=None, theta=0, divisions=4):
-    # img_a = img_a / 255.0
-    # img_b = img_b / 255.5
-    #
-    # thetas = np.linspace(0, np.pi, 4)
-    #
-    # real_a = np.zeros(img_a.shape)
-    # imag_a = np.zeros(img_a.shape)
-    # real_b = np.zeros(img_a.shape)
-    # imag_b = np.zeros(img_a.shape)
-    #
-    # for theta in thetas:
-    #     sreal_a, simag_a = gabor(img_a, frequency=0.1, theta=theta, bandwidth=1)
-    #     sreal_b, simag_b = gabor(img_b, frequency=0.1, theta=theta, bandwidth=1)
-    #
-    #     real_a += sreal_a
-    #     imag_a += simag_a
-    #     real_b += sreal_a
-    #     imag_b += simag_b
-    #
-    # if mask is None:
-    #     mask = np.ones(real_a.shape, dtype=np.uint8)
-    # else:
-    #     mask = cv.resize(mask, (0, 0), fx=scale, fy=scale)
-    #
-    #     # TODO: This is not okay - used only for initial test!!
-    #     all_max = max(np.abs(real_a).max(), np.abs(imag_a).max(), np.abs(real_b).max(), np.abs(imag_b).max())
-    #     eps = 10e-6
-    #
-    # real_a = np.int16((real_a / all_max) * (divisions // 2 - eps))
-    # imag_a = np.int16((imag_a / all_max) * (divisions // 2 - eps))
-    # real_b = np.int16((real_b / all_max) * (divisions // 2 - eps))
-    # imag_b = np.int16((imag_b / all_max) * (divisions // 2 - eps))
-    #
-    # hist_a, hist_b, hist_joint = eyeinfo.joint_gradient_histogram(real_a, imag_a, real_b, imag_b, mask,
-    #                                                               divisions)
-    #
-    # return hist_a, hist_b, hist_joint
     img_a = img_a.copy()
     img_b = img_b.copy()
-
-    # img_a = cv.equalizeHist(img_a)
-    # img_b = cv.equalizeHist(img_b)
-
-    # k = cv.getGaborKernel((0, 0), 2, 0, 2, 1)
-    # real_r = cv.filter2D(img_a, cv.CV_64F, k)
 
     img_a = img_a / 255.0
     img_b = img_b / 255.5
