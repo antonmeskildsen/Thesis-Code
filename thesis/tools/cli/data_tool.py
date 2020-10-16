@@ -162,7 +162,10 @@ def combine_json(positions: list, calibration_samples: int) -> dict:
 @track.command()
 @click.argument('path')
 @click.argument('calibration_samples', type=int)
-def create(path: str, calibration_samples: int):
+@click.option('--res-x', type=int, default=3840)
+@click.option('--res-y', type=int, default=2160)
+@click.option('--fov', type=float, default=87.0)
+def create(path: str, calibration_samples: int, res_x: int, res_y: int, fov: float):
     """Create single json file for gaze data.
 
     PATH: Path to folder containing images and json files.
@@ -174,6 +177,11 @@ def create(path: str, calibration_samples: int):
         positions = json.load(positions_file)
 
         output_data = combine_json(positions, calibration_samples)
+        output_data['screen'] = {
+            'res-x': res_x,
+            'res-y': res_y
+        }
+        output_data['fov'] = fov
 
         with open(os.path.join(path, 'data.json'), 'w') as output_file:
             json.dump(output_data, output_file, indent=4)
@@ -198,7 +206,7 @@ def get(paths, limit):
                 image_path = os.path.join(directory, f'{image:010d}.png')
                 images.append({
                     'image': os.path.abspath(image_path),
-                    'position': (x/2, 288 - y/2)
+                    'position': (x / 2, 288 - y / 2)
                 })
                 n += 1
 
