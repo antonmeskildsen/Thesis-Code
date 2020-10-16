@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 import cv2 as cv
 
+from numba import jit
+
 
 class Mask(ABC):
 
@@ -25,6 +27,9 @@ class Vec2:
     @staticmethod
     def from_tuple(tup):
         return Vec2(float(tup[0]), float(tup[1]))
+
+    def as_tuple(self):
+        return self.x, self.y
 
     def rounded(self):
         return int(self.x), int(self.y)
@@ -55,7 +60,7 @@ class Quadratic(Mask):
     def from_points_least_sq(points) -> Quadratic:
         points = np.array(points)
         x_in = points[:, 0]
-        mat = np.vstack((x_in**2, x_in, np.ones(len(points)))).T
+        mat = np.vstack((x_in ** 2, x_in, np.ones(len(points)))).T
         y = points[:, 1]
 
         solution = np.linalg.lstsq(mat, y, rcond=None)[0]
@@ -84,7 +89,7 @@ class Ellipse(Mask):
             raise ValueError("Cannot infer ellipse from less than 5 points.")
         points = np.array(points, np.float32)
         center, axes, angle = cv.fitEllipse(points)
-        axes = axes[0]/2, axes[1]/2
+        axes = axes[0] / 2, axes[1] / 2
         return Ellipse(Vec2.from_tuple(center), Vec2.from_tuple(axes), angle)
 
     def get_mask(self, size):
@@ -93,8 +98,11 @@ class Ellipse(Mask):
 
     def radius_at_angle(self, theta):
         a, b = self.axes.x, self.axes.y
-        return (a*b)/np.sqrt(a**2*np.sin(theta-self.angle)**2 + b**2*np.cos(theta-self.angle)**2)
+        return (a * b) / np.sqrt(a ** 2 * np.sin(theta - self.angle) ** 2 + b ** 2 * np.cos(theta - self.angle) ** 2)
 
     def intersect_angle(self, theta):
         r = self.radius_at_angle(theta)
-        return Vec2(self.center.x + r*np.sin(theta), self.center.y + r*np.cos(theta))
+        return Vec2(self.center.x + r * np.sin(theta), self.center.y + r * np.cos(theta))
+
+    def as_tuple(self):
+        return self.center.as_tuple(), self.axes.as_tuple(), self.angle

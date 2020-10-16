@@ -8,7 +8,62 @@ import numpy as np
 from skimage.filters import gabor, gabor_kernel
 from scipy import ndimage as ndi
 
+from numba import jit
+
 from thesis.geometry import Quadratic, Ellipse, Mask, Vec2
+
+
+@jit(nopython=True)
+def radius_at_angle(ellipse, theta):
+    _, (a, b), angle = ellipse
+    return (a * b) / np.sqrt(a ** 2 * np.sin(theta - angle) ** 2 + b ** 2 * np.cos(theta - angle) ** 2)
+
+
+@jit(nopython=True)
+def intersect_angle(ellipse, theta):
+    (cx, cy), _, _ = ellipse
+    r = radius_at_angle(ellipse, theta)
+    return cx + r * np.sin(theta), cy + r * np.cos(theta)
+
+
+@jit(nopython=True)
+def linear_interpolation(start: (float, float), stop: (float, float), num: int) -> (np.ndarray, np.ndarray):
+    return np.linspace(start[0], stop[0], num), np.linspace(start[1], stop[1], num)
+
+
+@jit(nopython=True, parallel=True)
+def polar_from_ellipses(img: np.ndarray, mask: np.ndarray, size: (int, int), inner, outer, start_angle=0) -> (
+        np.ndarray, np.ndarray):
+    """Create polar image.
+
+    Args:
+        img: input image
+        mask: image mask
+        size: (angular resolution, radial resolution)
+        inner: inner boundary ellipse
+        outer: outer boundary ellipse
+        start_angle:
+
+    Returns:
+
+    """
+    radial_resolution, angular_resolution = size
+    output = np.zeros((radial_resolution, angular_resolution), np.uint8)
+    output_mask = np.zeros((radial_resolution, angular_resolution), np.uint8)
+
+    angle_steps = np.linspace(start_angle, start_angle + 2 * np.pi, angular_resolution)
+    for i, theta in enumerate(angle_steps):
+        start = intersect_angle(inner, theta)
+        stop = intersect_angle(outer, theta)
+        margin = radial_resolution // 4
+        x_coord, y_coord = linear_interpolation(start, stop, radial_resolution + margin * 2)
+        for j, (x, y) in enumerate(zip(x_coord[margin:][:-margin], y_coord[margin:][:-margin])):
+            if x < 0 or y < 0 or x >= img.shape[1] or y >= img.shape[0]:
+                continue
+            output[j, i] = img[int(y), int(x)]
+            output_mask[j, i] = mask[int(y), int(x)]
+
+    return output, output_mask
 
 
 @dataclass
@@ -81,22 +136,9 @@ class IrisImage:
         if self.saved_angular_resolution != angular_resolution \
                 or self.saved_radial_resolution != radial_resolution \
                 or self.polar is None:
-
-            output = np.zeros((radial_resolution, angular_resolution), np.uint8)
-            output_mask = np.zeros((radial_resolution, angular_resolution), np.uint8)
-
-            angle_steps = np.linspace(start_angle, start_angle + 2 * np.pi, angular_resolution)
-            for i, theta in enumerate(angle_steps):
-                start, stop = self.segmentation.intersect_angle(theta)
-                margin = radial_resolution//4
-                x_coord, y_coord = start.linear_interpolation(stop, radial_resolution+margin*2)
-                for j, (x, y) in enumerate(zip(x_coord[margin:][:-margin], y_coord[margin:][:-margin])):
-                    if x < 0 or y < 0 or x >= self.image.shape[1] or y >= self.image.shape[0]:
-                        continue
-                    output[j, i] = self.image[int(y), int(x)]
-                    output_mask[j, i] = self.mask[int(y), int(x)]
-
-            self.polar = output, output_mask
+            self.polar = polar_from_ellipses(self.image, self.mask, (radial_resolution, angular_resolution),
+                                             self.segmentation.inner.as_tuple(), self.segmentation.outer.as_tuple(),
+                                             start_angle)
 
         return self.polar
 
@@ -177,24 +219,23 @@ class SKImageIrisCodeEncoder:
     def __init__(self, angles: int = 3,
                  angular_resolution=20,
                  radial_resolution=10,
+                 scales=6,
                  eps=0.01):
         self.angular_resolution = angular_resolution
         self.radial_resolution = radial_resolution
         self.eps = eps
+        self.scales = scales
         self.kernels = []
         for theta in range(0, angles):
             a = theta / angles * np.pi / 2
             kernel = gabor_kernel(1 / 3, a, bandwidth=1)
             self.kernels.append(kernel)
 
-    def encode(self, image, start_angle=0):
-        polar, polar_mask = image.to_polar(self.angular_resolution, self.radial_resolution, start_angle)
-        # polar = cv.equalizeHist(polar)
+    def encode_raw(self, polar, polar_mask):
         polar = np.float64(polar) / 255
 
         pyramid = [(polar, polar_mask)]
-        scales = 6
-        for _ in range(scales):
+        for _ in range(self.scales):
             p_next = cv.pyrDown(polar)
             m_next = cv.resize(polar_mask, (p_next.shape[1], p_next.shape[0]), cv.INTER_NEAREST)
             pyramid.append((p_next, m_next))
@@ -226,3 +267,7 @@ class SKImageIrisCodeEncoder:
                 mask.extend(m_imag.reshape(-1))
 
         return IrisCode(np.array(res), np.array(mask))
+
+    def encode(self, image, start_angle=0):
+        polar, polar_mask = image.to_polar(self.angular_resolution, self.radial_resolution, start_angle)
+        return self.encode_raw(polar, polar_mask)

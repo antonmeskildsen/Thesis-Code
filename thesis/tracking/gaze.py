@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from dataclasses import dataclass
 from typing import Tuple
 
 import cv2 as cv
@@ -23,7 +24,12 @@ class Model(Protocol):
         ...
 
 
+@dataclass
 class GazeModel:
+    screen_height: int
+    screen_width: int
+    fov: float
+
     @abstractmethod
     def calibrate(self, images, gaze_positions):
         """Calibrate the model.

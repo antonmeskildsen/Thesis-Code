@@ -52,6 +52,15 @@ class GradientHistogramTerm(ABC):
         ...
 
 
+class GaborTerm(ABC):
+    def __init__(self):
+        ...
+
+    @abstractmethod
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        ...
+
+
 class GazeTerm(ABC):
     def __init__(self):
         ...
@@ -83,6 +92,21 @@ class AbsoluteOriginalGradientEntropy(GradientHistogramTerm):
 class RelativeGradientEntropy(GradientHistogramTerm):
     def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
         return entropy_filtered / entropy_source
+
+
+class AbsoluteGaborMutualS0(GaborTerm):
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        return mutual_information[0]
+
+
+class AbsoluteGaborSourceS0(GaborTerm):
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        return entropy_source[0]
+
+
+class AbsoluteGaborFilteredS0(GaborTerm):
+    def __call__(self, entropy_source, entropy_filtered, mutual_information) -> float:
+        return entropy_filtered[0]
 
 
 # TODO: Add masks to calculation!
