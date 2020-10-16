@@ -89,9 +89,9 @@ class GaborEntropy(IrisMetric):
         self.histogram_divisions = histogram_divisions
 
         self._columns = list(chain.from_iterable([
-            [f'gabor_entropy_source_@{1 / scale}x', f'gabor_entropy_filtered_@{1 / scale}x',
-             f'gabor_mutual_information_@{1 / scale}x']
-            for scale in range(1, self.scales + 1)
+            [f'gabor_entropy_source_{1 / 2**scale}x', f'gabor_entropy_filtered_{1 / 2**scale}x',
+             f'gabor_mutual_information_{1 / 2**scale}x']
+            for scale in range(self.scales)
         ]))
 
     @property
@@ -100,7 +100,7 @@ class GaborEntropy(IrisMetric):
 
     def log(self, results: Logger, polar_image, polar_filtered, mask):
         angles = np.linspace(0, np.pi - np.pi/self.angles_per_scale, self.angles_per_scale)  # TODO: Consider subtracting small amount
-        for scale in range(1, self.scales+1):
+        for scale in range(self.scales):
             for theta in angles:
                 hist_source, hist_filtered, hist_joint = joint_gabor_histogram(polar_image, polar_filtered, mask,
                                                                                theta, self.histogram_divisions)
@@ -109,9 +109,9 @@ class GaborEntropy(IrisMetric):
                 entropy_filtered = entropy(hist_filtered)
                 mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
 
-                results.add(f'gabor_entropy_source_@{1 / scale}x', entropy_source)
-                results.add(f'gabor_entropy_filtered_@{1 / scale}x', entropy_filtered)
-                results.add(f'gabor_mutual_information_@{1 / scale}x', mutual_information)
+                results.add(f'gabor_entropy_source_{1 / 2**scale}x', entropy_source)
+                results.add(f'gabor_entropy_filtered_{1 / 2**scale}x', entropy_filtered)
+                results.add(f'gabor_mutual_information_{1 / 2**scale}x', mutual_information)
 
             polar_image = cv.pyrDown(polar_image)
             polar_filtered = cv.pyrDown(polar_filtered)
@@ -168,7 +168,7 @@ class ExcuseDetector(PupilDetector):
 
 class PupilDetectionError(PupilMetric):
     def __init__(self, detectors: List[type(PupilDetector)]):
-        self.detectors = map(lambda x: getattr(this, x)(), detectors)
+        self.detectors = [getattr(this, x)() for x in detectors]
         self._columns = list(chain.from_iterable([
             [f'pupil_distance_{d.name}_pixel_error_source', f'pupil_distance_{d.name}_pixel_error_filtered']
             for d in self.detectors
@@ -196,7 +196,7 @@ class ImageSimilarity(IrisMetric):
 
     def log(self, results: Logger, polar_image, polar_filtered, mask):
         code_source = self.encoder.encode_raw(polar_image, mask)
-        code_filtered = self.encoder.encode_raw(polar_image, mask)
+        code_filtered = self.encoder.encode_raw(polar_filtered, mask)
         iris_code_similarity = 1 - code_source.dist(code_filtered)
         results.add('iris_code_similarity', iris_code_similarity)
 

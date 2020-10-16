@@ -5,12 +5,21 @@ import os
 import numpy as np
 
 from thesis.optim import sampling
-from pupilfit import fit_else
+from pupilfit import fit_else, fit_excuse
 from thesis.deepeye import deepeye
 
 
 def fit_else_ref(img, debug=False):
     center, axes, angle = fit_else(img)
+    thresh = np.zeros(img.shape)
+    if debug:
+        return [center[1], center[0], axes[1], axes[0], angle], thresh
+    else:
+        return [center[1], center[0], axes[1], axes[0], angle]
+
+
+def fit_excuse_ref(img, debug=False):
+    center, axes, angle = fit_excuse(img)
     thresh = np.zeros(img.shape)
     if debug:
         return [center[1], center[0], axes[1], axes[0], angle], thresh
@@ -47,6 +56,10 @@ def type_name(x):
     return x.__name__
 
 
+def obj_type_name(x):
+    return type(x).__name__
+
+
 def json_to_strategy(data):
     params, generators = [], []
     for k, v in data.items():
@@ -58,7 +71,6 @@ def json_to_strategy(data):
 def progress(iterator, total):
     bar = st.progress(0)
     for i, v in enumerate(iterator):
-        bar.progress(i/total)
+        bar.progress(i / total)
         yield v
     bar.progress(100)
-

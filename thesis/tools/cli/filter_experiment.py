@@ -10,16 +10,12 @@ import pandas as pd
 import json
 
 from thesis.optim.sampling import GridSearch, Sampler
-from thesis.optim.multi_objective import MultiObjectiveOptimizer, NaiveMultiObjectiveOptimizer, ObfuscationObjective, \
-    PopulationMultiObjectiveOptimizer
+from thesis.optim.multi_objective import MultiObjectiveOptimizer, NaiveMultiObjectiveOptimizer, ObfuscationObjective
 from thesis.optim import multi_objective
 from thesis.optim import filters
-from thesis.optim import objective_terms
+from thesis.optim import metrics
 from thesis.tools.cli.utilities import load_gaze_data, load_iris_data, load_pupil_data
-from thesis.tools.st_utils import json_to_strategy
-from thesis.optim.status import TQDMBar
-
-from memory_profiler import profile
+from thesis.tools.st_utils import json_to_strategy, obj_type_name
 
 
 def progress_tqdm(iterator, total):
@@ -34,9 +30,12 @@ def main(config, name):
     with open(os.path.join('configs/filter_experiment/', config)) as file:
         data = yaml.safe_load(file)
 
-        with open(data['data_config']) as data_config_file, open(data['strategy_config']) as strategy_config_file:
+        with open(data['data_config']) as data_config_file, \
+                open(data['strategy_config']) as strategy_config_file, \
+                open(data['metrics_config']) as metrics_config_file:
             data_config = yaml.safe_load(data_config_file)
             strategy_config = yaml.safe_load(strategy_config_file)
+            metrics_config = yaml.safe_load(metrics_config_file)
 
         def load_data():
             return load_gaze_data(data_config['gaze_data']), load_iris_data(data_config['iris_data']), \
@@ -45,15 +44,16 @@ def main(config, name):
         loaded = load_data()
         gaze_data, iris_data, pupil_data = loaded
 
-        metrics = data['metrics']
+        dmetrics = data['metrics']
+
+        ag = metrics_config['constructor_args']
 
         def do(x):
-            return getattr(objective_terms, x)()
+            return getattr(metrics, x)(**ag[x])
 
-        iris_terms = list(map(do, metrics['iris_metrics']))
-        histogram_terms = list(map(do, metrics['histogram_metrics']))
-        gaze_terms = list(map(do, metrics['gaze_metrics']))
-        pupil_terms = list(map(do, metrics['pupil_metrics']))
+        iris_terms = list(map(do, dmetrics['iris_metrics']))
+        gaze_terms = list(map(do, dmetrics['gaze_metrics']))
+        pupil_terms = list(map(do, dmetrics['pupil_metrics']))
 
         optimizers: Dict[str, MultiObjectiveOptimizer] = {}
         projected_iterations = 0
@@ -78,46 +78,15 @@ def main(config, name):
             sampling = GridSearch
 
             for f in map(lambda f: getattr(filters, f), data['filters']):
-                objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, histogram_terms,
-                                                 gaze_terms,
-                                                 pupil_terms,
-                                                 iris_samples, gaze_samples, pupil_samples)
+                objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms,
+                                                 pupil_terms, iris_samples, gaze_samples, pupil_samples,
+                                                 data['polar_resolution'])
                 params, generators = json_to_strategy(strategy_config[f.__name__])
                 sampler: Sampler = sampling(params, generators)
                 projected_iterations += len(sampler)
                 optimizers[f.__name__] = method([], objective, sampler)
         else:
             raise NotImplementedError("Only NaiveMultiObjectiveOptimizer currently supported.")
-        # elif method == PopulationMultiObjectiveOptimizer:
-        #     params['configuration'] = strategy_config
-        #     generations = st.sidebar.number_input('Generations (K)', 0, 10, 5)
-        #     iterations = st.sidebar.number_input('Iterations', 1, 100, 2)
-        #     selection = st.sidebar.selectbox('Selection technique', (TruncationSelection, TournamentSelection),
-        #                                      format_func=type_name)
-        #     crossover = st.sidebar.selectbox('Crossover technique', (UniformCrossover,), format_func=type_name)
-        #     # mutation = st.sidebar.selectbox('Mutation technique', (GaussianMutation,), format_func=type_name)
-        #
-        #     pop_num = st.number_input('Population', 1, 1000, 10)
-        #
-        #     projected_iterations = iterations * pop_num * len(filters)
-        #
-        #     for f in filters:
-        #         objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, histogram_terms,
-        #                                          gaze_terms,
-        #                                          pupil_terms,
-        #                                          iris_samples, gaze_samples, pupil_samples)
-        #         init = PopulationInitializer(*make_strategy(config[f.__name__], pop_num))
-        #
-        #         sigmas = []
-        #         means = []
-        #         for param in config[f.__name__].values():
-        #             sigmas.append(param['mutation']['sigma'])
-        #             means.append(param['mutation']['mean'])
-        #         mutation = GaussianMutation(np.array(sigmas), np.array(means))
-        #
-        #         optimizers[f.__name__] = PopulationMultiObjectiveOptimizer([], objective, selection(generations),
-        #                                                                    crossover(),
-        #                                                                    mutation, iterations, init)
 
         results = []
 
@@ -128,15 +97,15 @@ def main(config, name):
         'Results computed!'
 
         for filter_name, o in optimizers.items():
-            metrics = o.metrics()
-            pareto = [o.pareto_frontier(k) for k in range(max([m[2] for m in metrics]) + 1)]
+            dmetrics = o.metrics()
+            pareto = [o.pareto_frontier(k) for k in range(max([m[2] for m in dmetrics]) + 1)]
 
-            metrics_df = [{**a, **b, 'pareto': i in pareto[generations], 'filter': filter_name, 'k': generations} for
-                          i, (a, b, generations) in
-                          enumerate(metrics)]
-            results.extend(metrics_df)
+            dmetrics_df = [{**a, **b, 'pareto': i in pareto[generations], 'filter': filter_name, 'k': generations} for
+                           i, (a, b, generations) in
+                           enumerate(dmetrics)]
+            results.extend(dmetrics_df)
             # results[filter_name] = metrics_df
-            metrics = pd.DataFrame(metrics_df)
+            dmetrics = pd.DataFrame(dmetrics_df)
 
         with open(os.path.join('results', f'{name}.json'), 'w') as f2:
             json.dump({

@@ -5,6 +5,8 @@ import json
 
 import pandas as pd
 import altair as alt
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 from tools.st_utils import file_select
 from thesis.optim.pareto import pareto_frontier
@@ -33,36 +35,49 @@ else:
     k = 0
 
 # alt.X(x, scale=alt.Scale(domain=(0, dom)))
-c = alt.Chart(frame[frame['k'] == k]).mark_point().encode(
+c = alt.Chart(frame).mark_point().encode(
     x=x,
     y=y,
-    color='filter'
+    #color='filter'
 ).interactive()
 
-if do_pareto:
-    pareto_frontier(frame, [x, y])
-    c = c + alt.Chart(frame[frame['k'] == k]).mark_line().encode(
-        x=x,
-        y=y,
-        color='filter'
-    ).transform_filter(alt.datum.pf).interactive()
+# if do_pareto:
+#     pareto_frontier(frame, [x, y])
+#     c = c + alt.Chart(frame).mark_line().encode(
+#         x=x,
+#         y=y,
+#         color='filter'
+#     ).transform_filter(alt.datum.pf).interactive()
 st.altair_chart(c, use_container_width=True)
+xS = pd.Series(frame[y], name='x')
+yS = pd.Series(frame[x], name='y')
+data = pd.concat([xS, yS], axis=1)
+
+st.write(frame.columns)
+
+# fig, ax = plt.subplots()
+sns.relplot(x=x, y=y, hue='filter', data=frame)
+st.pyplot()
+
+# g = sns.lmplot(x='x', y='y', data=data)
+# st.pyplot()
 
 '## Performance analysis'
 threshold = st.slider('Maximum gaze error', 0.0, 2.0, 1.0)
-filtered = frame[frame['AbsoluteGazeAccuracy'] < threshold]
+# filtered = frame[frame['AbsoluteGazeAccuracy'] < threshold]
+filtered = frame
 # st.write(filtered)
 
-c = alt.Chart(filtered[frame['k'] == k]).mark_point().encode(
-    x=x,
-    y=y,
-    color='filter'
-).interactive()
-
-if do_pareto:
-    c = c + alt.Chart(filtered[frame['k'] == k]).mark_line().encode(
-        x=x,
-        y=y,
-        color='filter'
-    ).transform_filter(alt.datum.pareto).interactive()
-st.altair_chart(c, use_container_width=True)
+# c = alt.Chart(filtered[frame['k'] == k]).mark_point().encode(
+#     x=x,
+#     y=y,
+#     color='filter'
+# ).interactive()
+#
+# if do_pareto:
+#     c = c + alt.Chart(filtered[frame['k'] == k]).mark_line().encode(
+#         x=x,
+#         y=y,
+#         color='filter'
+#     ).transform_filter(alt.datum.pareto).interactive()
+# st.altair_chart(c, use_container_width=True)
