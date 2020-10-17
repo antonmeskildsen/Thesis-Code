@@ -10,14 +10,18 @@ from sklearn.neighbors.kde import KernelDensity
 import cv2 as cv
 from glob2 import glob
 from itertools import product
+import yaml
 
 import seaborn as sns
 import matplotlib.pyplot as plt
 
 import npeet.entropy_estimators as ee
 
-from thesis.optim.filters import gaussian_filter
+from thesis.optim.filters import mean_filter, anisotropic_diffusion, bilateral_filter, gaussian_filter, uniform_noise, \
+    gaussian_noise, cauchy_noise, salt_and_pepper
+
 from thesis.segmentation import IrisImage, IrisSegmentation, IrisCodeEncoder, IrisCode, SKImageIrisCodeEncoder
+from thesis.tools.st_utils import type_name
 
 "# Explorer"
 
@@ -34,8 +38,6 @@ the_filter = gaussian_filter
 
 scales = st.sidebar.slider('Scales', 1, 10, 6)
 angles = st.sidebar.slider('Angles', 1, 20, 6)
-wavelength = st.sidebar.number_input('Wavelength Base', 0.0, 10.0, 0.5)
-mult = st.sidebar.number_input('Wavelength multiplier', 1.0, 5.0, 1.81)
 angular = st.sidebar.slider('Angular Resolution', 5, 100, 30, 1)
 radial = st.sidebar.slider('Radial Resolution', 2, 50, 18, 1)
 
@@ -64,7 +66,8 @@ def get_code(img, info):
     while height < len(code) and len(code) % height != 0:
         height += 1
     code = np.array(code).reshape((height, -1))
-    st.image([iris_img.image, iris_img.mask*255, polar, polar_mask * 255, code], ['regular', 'mask', 'polar', 'polar_mask', 'code'])
+    st.image([iris_img.image, iris_img.mask * 255, polar, polar_mask * 255, code],
+             ['regular', 'mask', 'polar', 'polar_mask', 'code'])
     return ic
 
 
@@ -210,13 +213,11 @@ if st.checkbox('Stats'):
     st.pyplot()
 
     if should_export:
-        with open(os.path.join('results', 'recognition', f'{name}.json'), 'w') as file:
+        with open(os.path.join('results', 'recognition', f'{name}.json'), 'w') as filename:
             json.dump({
                 'parameters': {
                     'scales': scales,
                     'angles': angles,
-                    'wavelength': wavelength,
-                    'wavelength_multiplier': mult,
                     'resolution': {
                         'angular': angular,
                         'radial': radial,
@@ -226,32 +227,39 @@ if st.checkbox('Stats'):
                     'intra_distances': list(intra_distances),
                     'inter_distances': list(inter_distances),
                 }
-            }, file)
+            }, filename)
 
 """
-## Entropy estimation
+# Filter configuration
 """
-if st.checkbox('Entropy estimation'):
-    image_array = []
-    bar = st.progress(0)
-    length = len(data['data'])
-    for i, sample in enumerate(data['data']):
-        bar.progress(i / length)
-        seg = IrisSegmentation.from_dict(sample['points'])
-        img = cv.imread(sample['image'], cv.IMREAD_GRAYSCALE)
-        iris_img = IrisImage(seg, img)
-        # polar, mask = iris_img.to_polar(angular, radial)
-        polar = np.ones((angular, radial))
-        linear = polar.reshape(-1)
-        # ic = encoder.encode(iris_img)
-        image_array.append(linear)
-    bar.progress(100)
+st.radio('Filter type', (
+    mean_filter, anisotropic_diffusion, bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, cauchy_noise,
+    salt_and_pepper), format_func=type_name)
 
-    # kde = KernelDensity(kernel='gaussian', bandwidth=1000).fit(image_array)
-    # log_p = kde.score_samples(image_array)
-    # p = np.exp(log_p)
-    # entropy = -np.sum(p*log_p)
 
-    ent = ee.entropy(image_array, k=3, base=2)
+mean_filter.__p
 
-    st.write(ent)
+"""
+# Export configuration
+"""
+filename = st.text_input('Output name')
+path = os.path.join('configs/iris_recognition', f'{filename}.yaml')
+if st.button('Export now'):
+    with open(path, 'w') as file:
+        config = {
+            'parameters': {
+                'scales': scales,
+                'angles': angles,
+                'resolution': {
+                    'angular': angular,
+                    'radial': radial,
+                },
+                'rotation': {
+                    'num': angle_tests,
+                    'step_size': spacing
+                },
+                'epsilon': eps
+            },
+            'dataset': os.path.join(base, f'{dataset}.json')
+        }
+        yaml.safe_dump(config, file)
