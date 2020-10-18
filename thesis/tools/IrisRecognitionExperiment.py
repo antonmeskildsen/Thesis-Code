@@ -1,6 +1,7 @@
 import streamlit as st
 
 import os
+import inspect
 from collections import defaultdict
 import json
 import numpy as np
@@ -232,12 +233,15 @@ if st.checkbox('Stats'):
 """
 # Filter configuration
 """
-st.radio('Filter type', (
+ftypes = [func for func in (
     mean_filter, anisotropic_diffusion, bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, cauchy_noise,
-    salt_and_pepper), format_func=type_name)
+    salt_and_pepper) if st.checkbox(func.__name__)]
 
-
-mean_filter.__p
+filters = {}
+for func in ftypes:
+    f'### Arguments for {func.__name__}'
+    args = {v: st.number_input(v) for v in inspect.getfullargspec(func).args[1:]}
+    filters[func.__name__] = args
 
 """
 # Export configuration
@@ -260,6 +264,7 @@ if st.button('Export now'):
                 },
                 'epsilon': eps
             },
+            'filters': filters,
             'dataset': os.path.join(base, f'{dataset}.json')
         }
         yaml.safe_dump(config, file)
