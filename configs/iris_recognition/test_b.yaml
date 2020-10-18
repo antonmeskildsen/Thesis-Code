@@ -1,0 +1,14 @@
+dataset: /Users/Anton/Desktop/data/iris/casia4i_mini.json
+filters:
+  gaussian_filter:
+    sigma: 5.0
+parameters:
+  angles: 6
+  epsilon: 0.001
+  resolution:
+    angular: 60
+    radial: 15
+  rotation:
+    num: 7
+    step_size: 3
+  scales: 6

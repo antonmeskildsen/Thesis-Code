@@ -17,7 +17,8 @@ file_path = file_select('Result file', os.path.join('results', 'recognition', '*
 with open(file_path) as file:
     data = json.load(file)
 
-st.write(data['parameters'])
+if 'parameters' in data:
+    st.write(data['parameters'])
 
 intra_distances = np.array(data['results']['intra_distances'])
 inter_distances = np.array(data['results']['inter_distances'])
