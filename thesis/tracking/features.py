@@ -64,10 +64,10 @@ def ratio(contour):
 
 
 def find_glints(gray, center, *,
-                radius=65,
+                radius=60,
                 threshold=184,
-                max_area=65,
-                min_ratio=0.25,
+                max_area=70,
+                min_ratio=0.2,
                 debug=False):
     """Detects and returns up to four glint candidates for a given image.
 

@@ -5,10 +5,11 @@ import json
 
 import cv2 as cv
 import numpy as np
+import math
 from skimage.filters import gabor, gabor_kernel
 from scipy import ndimage as ndi
 
-from numba import jit
+from numba import jit, vectorize, prange
 
 from thesis.geometry import Quadratic, Ellipse, Mask, Vec2
 
@@ -27,19 +28,81 @@ def intersect_angle(ellipse, theta):
 
 
 @jit(nopython=True)
+def polar_to_cartesian(cx, cy, radius, theta):
+    return cx + radius * np.sin(theta), cy + radius * np.cos(theta)
+
+
+@jit(nopython=True)
 def linear_interpolation(start: (float, float), stop: (float, float), num: int) -> (np.ndarray, np.ndarray):
     return np.linspace(start[0], stop[0], num), np.linspace(start[1], stop[1], num)
 
 
-@jit(nopython=True, parallel=True)
-def polar_from_ellipses(img: np.ndarray, mask: np.ndarray, size: (int, int), inner, outer, start_angle=0) -> (
+@jit(nopython=True, parallel=True, error_model='numpy')
+def polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_steps, radii, cx, cy):
+    output = np.zeros((radial_resolution, angular_resolution), np.uint8)
+    output_mask = np.zeros((radial_resolution, angular_resolution), np.uint8)
+
+    n_samples = 30
+    random_thetas_seed = np.random.uniform(0, 1, n_samples)
+    random_radii_seed = np.random.uniform(0, 1, n_samples)
+
+    for j in prange(radial_resolution):
+        for i in prange(angular_resolution):
+            r_left_1, r_left_2 = radii[j, i], radii[j + 1, i]
+            r_right_1, r_right_2 = radii[j, i + 1], radii[j + 1, i + 1]
+
+            min_radius = min(r_left_1, r_right_1)
+            max_radius = max(r_left_2, r_right_2)
+
+            # random_thetas_seed = np.random.uniform(0, 1, n_samples)
+            random_thetas = angle_steps[i] + random_thetas_seed * (angle_steps[i + 1] - angle_steps[i])
+            min_radii = min_radius + random_thetas_seed * abs(r_right_1 - r_left_1)
+            max_radii = max_radius + random_thetas_seed * abs(r_right_2 - r_left_2)
+            random_radii = min_radii + random_radii_seed * (max_radii - min_radii)
+            # random_radii = np.random.uniform(min_radii, max_radii, n_samples)
+
+            # coords = np.zeros((2, n_samples), np.uint8)
+            val_img = 0.
+            val_mask = 0.
+            num = 0
+            for k in range(n_samples):
+                x, y = polar_to_cartesian(cx, cy, random_radii[k], random_thetas[k])
+                x, y = round(x), round(y)
+                if 0 <= x < img.shape[1] and 0 <= y < img.shape[0]:
+                    val_img += img[y, x]
+                    val_mask += mask[y, x]
+                    num += 1
+
+            val_img /= num
+            val_mask /= num
+            # coords = [polar_to_cartesian(inner[0], r, t) for (r, t) in zip(random_radii, random_thetas)]
+            # coords = [(round(x), round(y)) for (x, y) in coords]
+            # coords = np.array([[x, y] for (x, y) in coords if 0 <= x < img.shape[1] and 0 <= y < img.shape[0]])
+            # coords = list(filter(lambda c: 0 <= c[0] < img.shape[1] and 0 <= c[1] < img.shape[0], coords))
+
+            # val_img = img[coords].mean()
+            # val_mask = mask[coords].mean()
+            # val_img = np.array([img[y, x] for (x, y) in coords]).mean()
+            # val_mask = np.array([mask[y, x] for (x, y) in coords]).mean()
+            if math.isnan(val_img):
+                continue
+            output[j, i] = val_img
+            output_mask[j, i] = 1 if val_mask > 0.2 else 0
+
+    return output, output_mask
+
+
+@jit(nopython=True, parallel=True, error_model='numpy')
+def polar_from_ellipses(img: np.ndarray, mask: np.ndarray, angular_resolution: int, radial_resolution: int, inner,
+                        outer, start_angle=0) -> (
         np.ndarray, np.ndarray):
     """Create polar image.
 
     Args:
         img: input image
         mask: image mask
-        size: (angular resolution, radial resolution)
+        radial_resolution:
+        angular_resolution:
         inner: inner boundary ellipse
         outer: outer boundary ellipse
         start_angle:
@@ -47,23 +110,44 @@ def polar_from_ellipses(img: np.ndarray, mask: np.ndarray, size: (int, int), inn
     Returns:
 
     """
-    radial_resolution, angular_resolution = size
-    output = np.zeros((radial_resolution, angular_resolution), np.uint8)
-    output_mask = np.zeros((radial_resolution, angular_resolution), np.uint8)
 
-    angle_steps = np.linspace(start_angle, start_angle + 2 * np.pi, angular_resolution)
+    angle_steps = np.linspace(start_angle, start_angle + 2 * np.pi, angular_resolution + 1)
+    radii = np.zeros((radial_resolution + 1, angular_resolution + 1))
+
     for i, theta in enumerate(angle_steps):
-        start = intersect_angle(inner, theta)
-        stop = intersect_angle(outer, theta)
-        margin = radial_resolution // 4
-        x_coord, y_coord = linear_interpolation(start, stop, radial_resolution + margin * 2)
-        for j, (x, y) in enumerate(zip(x_coord[margin:][:-margin], y_coord[margin:][:-margin])):
-            if x < 0 or y < 0 or x >= img.shape[1] or y >= img.shape[0]:
-                continue
-            output[j, i] = img[int(y), int(x)]
-            output_mask[j, i] = mask[int(y), int(x)]
+        start = radius_at_angle(inner, theta)
+        stop = radius_at_angle(outer, theta)
+        margin = radial_resolution // 8
+        radial_steps = np.linspace(start, stop, radial_resolution + 1 + margin * 2)
+        for j, step in enumerate(radial_steps[margin:][:-margin]):
+            radii[j, i] = step
 
-    return output, output_mask
+    n_samples = 30
+
+    # for i, theta in enumerate(angle_steps):
+    #     start = intersect_angle(inner, theta)
+    #     stop = intersect_angle(outer, theta)
+    #     margin = radial_resolution // 4
+    #     x_coord, y_coord = linear_interpolation(start, stop, radial_resolution + margin * 2)
+    #
+    #     for j, (x, y) in enumerate(zip(x_coord[margin:][:-margin], y_coord[margin:][:-margin])):
+    #         if x < 0 or y < 0 or x >= img.shape[1] or y >= img.shape[0]:
+    #             continue
+    #
+    #         diff_y = y - int(y)
+    #         diff_x = x - int(x)
+    #         y1, y2 = int(y), int(y)+1
+    #         x1, x2 = int(x), int(x)+1
+    #         fxy1 = (1-diff_x)*img[y1, x1] + diff_x*img[y1, x2]
+    #         fxy2 = (1-diff_x)*img[y2, x1] + diff_x*img[y2, x2]
+    #         fxy = (1-diff_y)*fxy1 + diff_y*fxy2
+    #         output[j, i] = fxy
+    #         # output[j, i] = img[int(y), int(x)]
+    #         output_mask[j, i] = mask[round(y), round(x)]
+    #
+
+    return polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_steps, radii, inner[0][0],
+                           inner[0][1])
 
 
 @dataclass
@@ -136,7 +220,7 @@ class IrisImage:
         if self.saved_angular_resolution != angular_resolution \
                 or self.saved_radial_resolution != radial_resolution \
                 or self.polar is None:
-            self.polar = polar_from_ellipses(self.image, self.mask, (radial_resolution, angular_resolution),
+            self.polar = polar_from_ellipses(self.image, self.mask, angular_resolution, radial_resolution,
                                              self.segmentation.inner.as_tuple(), self.segmentation.outer.as_tuple(),
                                              start_angle)
 
@@ -232,11 +316,11 @@ class SKImageIrisCodeEncoder:
             self.kernels.append(kernel)
 
     def encode_raw(self, polar, polar_mask):
-        polar = np.float64(polar) / 255
-
-        pyramid = [(polar, polar_mask)]
+        p_next = np.float64(polar) / 255
+        # p_next = cv.pyrDown(p_next)
+        pyramid = [(p_next, polar_mask)]
         for _ in range(self.scales):
-            p_next = cv.pyrDown(polar)
+            p_next = cv.pyrDown(p_next)
             m_next = cv.resize(polar_mask, (p_next.shape[1], p_next.shape[0]), cv.INTER_NEAREST)
             pyramid.append((p_next, m_next))
 
@@ -251,7 +335,6 @@ class SKImageIrisCodeEncoder:
                 m_real = np.zeros(f_real.shape, np.uint8)
 
                 f_complex = np.dstack((f_real, f_imag)).view(dtype=np.complex128)[:, :, 0]
-                # print(f_complex.shape)
 
                 m_real[np.abs(f_complex) < self.eps] = 1
                 f_real = np.sign(f_real)

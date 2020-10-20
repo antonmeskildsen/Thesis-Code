@@ -1,6 +1,6 @@
 polar_resolution:
-  angular: 200
-  radial: 20
+  angular: 100
+  radial: 10
 
 constructor_args:
   GradientEntropy:
@@ -19,5 +19,5 @@ constructor_args:
 
   ImageSimilarity:
     angles: 6
-    scales: 6
-    eps: 0.001
+    scales: 4
+    eps: 0.0001

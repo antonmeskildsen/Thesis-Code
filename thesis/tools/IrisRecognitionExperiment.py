@@ -16,7 +16,6 @@ import yaml
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-import npeet.entropy_estimators as ee
 
 from thesis.optim.filters import mean_filter, anisotropic_diffusion, bilateral_filter, gaussian_filter, uniform_noise, \
     gaussian_noise, cauchy_noise, salt_and_pepper
@@ -26,8 +25,8 @@ from thesis.tools.st_utils import type_name
 
 "# Explorer"
 
-# base = '/home/anton/data/eyedata/iris'
-base = '/Users/Anton/Desktop/data/iris'
+base = '/home/anton/data/eyedata/iris'
+# base = '/Users/Anton/Desktop/data/iris'
 
 files = glob(os.path.join(base, '*.json'))
 names = [os.path.basename(p).split('.')[0] for p in files]
@@ -39,8 +38,8 @@ the_filter = gaussian_filter
 
 scales = st.sidebar.slider('Scales', 1, 10, 6)
 angles = st.sidebar.slider('Angles', 1, 20, 6)
-angular = st.sidebar.slider('Angular Resolution', 5, 100, 30, 1)
-radial = st.sidebar.slider('Radial Resolution', 2, 50, 18, 1)
+angular = st.sidebar.number_input('Angular Resolution', 5, 1000, 30, 1)
+radial = st.sidebar.number_input('Radial Resolution', 2, 500, 18, 1)
 
 angle_tests = st.sidebar.number_input('Test angles', 1, 20, 7)
 spacing = st.sidebar.number_input('Angular spacing', 0, 20, 5)
@@ -48,14 +47,14 @@ spacing = st.sidebar.number_input('Angular spacing', 0, 20, 5)
 eps = st.sidebar.number_input('Epsilon', 0.0001, 20.0, 0.001, 0.0001)
 
 # encoder = IrisCodeEncoder(scales, angles, angular, radial, wavelength, mult, eps)
-encoder = SKImageIrisCodeEncoder(angles, angular, radial, eps)
+encoder = SKImageIrisCodeEncoder(angles, angular, radial, scales, eps)
 
 
 def get_code(img, info):
     seg = IrisSegmentation.from_dict(info)
     # m = seg.get_mask((250, 250))
     iris_img = IrisImage(seg, img)
-    polar, polar_mask = iris_img.to_polar(50, 30)
+    polar, polar_mask = iris_img.to_polar(angular, radial)
     scale = 3
     polar = cv.resize(polar, (0, 0), fx=scale, fy=scale)
     polar_mask = cv.resize(polar_mask, (0, 0), fx=scale, fy=scale)
@@ -63,10 +62,16 @@ def get_code(img, info):
     code = ic.masked_image()
     saved = np.array(code)
 
-    height = 30
-    while height < len(code) and len(code) % height != 0:
-        height += 1
+    height = radial*scales
+    extra = len(code) % height
+    c = list(code)
+    c.extend([0] * (height-extra))
+    st.write(len(c))
+    code = np.array(c)
+    # while height < len(code) and len(code) % height != 0:
+    #     height += 1
     code = np.array(code).reshape((height, -1))
+    st.write(code.shape)
     st.image([iris_img.image, iris_img.mask * 255, polar, polar_mask * 255, code],
              ['regular', 'mask', 'polar', 'polar_mask', 'code'])
     return ic
@@ -158,6 +163,29 @@ if st.checkbox('Compare'):
     # dist = (c1 != c2).sum() / (c1.size - n)
     # dist = np.linalg.norm(np.array(c1, np.float64)-np.array(c2, np.float64))
     f'Distance: {c1.dist(c2)}'
+
+"## Base evaluation on random input"
+if st.checkbox('Base'):
+    bar = st.progress(0)
+    res = []
+    for i in range(100):
+        img = np.uint8(np.random.uniform(0, 255, img2.shape))
+        img2 = np.uint8(np.random.uniform(0, 255, img2.shape))
+
+        seg1 = IrisSegmentation.from_dict(info['points'])
+        seg2 = IrisSegmentation.from_dict(info2['points'])
+        ir1 = IrisImage(seg1, img)
+        ir2 = IrisImage(seg2, img2)
+        c1 = encoder.encode(ir1)
+        c2 = encoder.encode(ir2)
+
+        res.append(c1.dist(c2))
+        bar.progress((i+1)/100)
+
+    fig, ax = plt.subplots()
+    sns.distplot(res, ax=ax)
+    st.pyplot(fig)
+
 
 "## Export"
 name = st.text_input('File path')

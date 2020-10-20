@@ -14,6 +14,7 @@ from thesis.tracking.gaze import GazeModel, BasicGaze
 from thesis.tracking.features import normalize_coordinates, pupil_detector
 
 from thesis.tools.st_utils import fit_else_ref, create_deepeye_func
+deepeye_ref = create_deepeye_func()
 
 
 @dataclass
@@ -52,8 +53,8 @@ class GazeDataset:
             calibration_samples = list(map(lambda d: GazeImage.from_json(path, d), data['calibration']))
             test_samples = list(map(lambda d: GazeImage.from_json(path, d), data['test']))
 
-            model = BasicGaze(data['screen']['res-x'], data['screen']['res-y'], data['fov'],
-                              pupil_detector=fit_else_ref)
+            model = BasicGaze(data['screen']['res-y'], data['screen']['res-x'], data['fov'],
+                              pupil_detector=deepeye_ref)
             images = [s.image for s in calibration_samples]
             gaze_positions = [s.screen_position for s in calibration_samples]
             model.calibrate(images, gaze_positions)
