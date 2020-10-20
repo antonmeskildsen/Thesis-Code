@@ -92,7 +92,7 @@ def main(config, name):
 
         for filter_name, o in optimizers.items():
             f'Running optimizer for {filter_name}'
-            o.run(wrapper=tqdm, parallel=True)
+            o.run(wrapper=tqdm, parallel=False)
 
         'Results computed!'
 

@@ -12,7 +12,7 @@ import cv2 as cv
 from tqdm import tqdm
 
 from multiprocessing import Pool
-from itertools import repeat
+from itertools import repeat, product
 
 import seaborn as sns
 
@@ -39,25 +39,37 @@ def create_code(args):
         return codes
 
 
-def create_row(args):
-    dataset, codes, i, n, num_rotations = args
+def compare(args):
+    (left, right), codes, (i, j), num_rotations = args
 
-    distance_matrix = np.zeros((1, n))
-    same_mask = np.zeros((1, n), np.bool)
+    same = False
+    if left.user_id == right.user_id and left.eye == right.eye:
+        same = True
 
-    for j in range(n):
-        in_data = dataset.samples
-        info_i = in_data[i]
-        info_j = in_data[j]
-        same = False
-        if info_i.user_id == info_j.user_id and info_i.eye == info_j.eye:
-            same = True
-            same_mask[0, j] = True
+    distance = min([codes[i][num_rotations // 2].dist(cb) for cb in codes[j]])
 
-        if same or random.random() < 2:  # Rate
-            distance_matrix[0, j] = min([codes[i][num_rotations // 2].dist(cb) for cb in codes[j]])
+    return (i, j), (distance, same)
 
-    return distance_matrix, same_mask
+
+# def create_row(args):
+#     dataset, codes, i, n, num_rotations = args
+#
+#     distance_matrix = np.zeros((1, n))
+#     same_mask = np.zeros((1, n), np.bool)
+#
+#     for j in range(n):
+#         in_data = dataset.samples
+#         info_i = in_data[i]
+#         info_j = in_data[j]
+#         same = False
+#         if info_i.user_id == info_j.user_id and info_i.eye == info_j.eye:
+#             same = True
+#             same_mask[0, j] = True
+#
+#         if same or random.random() < 2:  # Rate
+#             distance_matrix[0, j] = min([codes[i][num_rotations // 2].dist(cb) for cb in codes[j]])
+#
+#     return distance_matrix, same_mask
 
 
 @click.command()
@@ -97,28 +109,37 @@ def main(config, output, filter):
             for s in tqdm(dataset.samples):
                 s.image.image = ffunc(s.image.image)
 
-        pool = Pool()
-
         args = list(zip(repeat(encoder), dataset.samples, repeat(num_rotations), repeat(step_size)))
 
         # codes = []
-        codes = list(map(create_code, tqdm(args, total=len(dataset))))
+        # pool = Pool(processes=7)
+        codes = list(tqdm(map(create_code, args), total=len(dataset)))
         # for item in tqdm(dataset.samples):
         #     codes.append(create_code(encoder, item.image, num_rotations, step_size))
         print('[INFO] codes created')
         n = len(codes)
-        distance_matrix = np.zeros((n, n))
-        same_mask = np.zeros((n, n), np.bool)
-        num_samples = 0
 
-        args = list(zip(repeat(dataset), repeat(codes), range(n), repeat(n), repeat(num_rotations)))
+        comparisons = list(product(range(n), range(n)))
+        comparison_samples = map(lambda v: (dataset.samples[v[0]], dataset.samples[v[1]]), comparisons)
+        args = list(zip(comparison_samples, repeat(codes), comparisons, repeat(num_rotations)))
+        # args = list(zip(repeat(dataset), repeat(codes), range(n), repeat(n), repeat(num_rotations)))
 
         print('[INFO] comparing codes')
-        results = list(pool.imap(create_row, tqdm(args, total=n)))
-        distances, masks = zip(*results)
 
-        distance_matrix = np.vstack(distances)
-        same_mask = np.vstack(masks)
+        # results = list(tqdm(map(create_row, args), n))
+        results = list(tqdm(map(compare, args), total=len(args)))
+        distance_matrix = np.zeros((n, n))
+        same_mask = np.zeros((n, n), np.bool)
+        for (i, j), (distance, same) in results:
+            distance_matrix[i, j] = distance
+            same_mask[i, j] = same
+
+        # pool.close()
+        # pool.join()
+        # distances, masks = zip(*results)
+
+        # distance_matrix = np.vstack(distances)
+        # same_mask = np.vstack(masks)
 
         # for i in tqdm(range(n), total=n):
         #     for j in range(n):

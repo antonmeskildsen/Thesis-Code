@@ -40,8 +40,8 @@ path = st.selectbox('Dataset', sets)
 
 gaze_positions = load_json(path, 'positions')
 
-WIDTH = 3840
-HEIGHT = 2160
+WIDTH = st.number_input('Screen width', 0, 10000, 1920)
+HEIGHT = st.number_input('Screen height', 0, 10000, 1080)
 
 images = load_images(path)
 images = [cv.cvtColor(img, cv.COLOR_BGR2GRAY) for img in images]
@@ -145,7 +145,7 @@ if st.sidebar.checkbox('Calc gaze'):
     test_X = images[n_cal:]
     test_y = gaze_positions[n_cal:]
 
-    model = BasicGaze(screen_width=0, screen_height=0, fov=0,
+    model = BasicGaze(screen_height=HEIGHT, screen_width=WIDTH, fov=0,
                       glint_args=dict(threshold=thresh, radius=radius, max_area=area, min_ratio=ratio), model=model,
                       pupil_detector=pupil_detector)
     model.calibrate(train_X, train_y)

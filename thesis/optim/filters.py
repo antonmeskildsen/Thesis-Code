@@ -7,12 +7,21 @@ rng = np.random.default_rng()
 
 
 def mean_filter(img, size):
-    return cv.blur(img, size)
+    return cv.blur(img, (size, size))
+
+
+def median_filter(img, size):
+    return cv.medianBlur(img, size)
 
 
 def anisotropic_diffusion(img, kappa: float, gamma: float, iterations: int=1):
+    img = img / 255
     img = smoothing.anisotropic_diffusion(img, iterations, kappa, gamma)
-    return img
+    return np.uint8(img*255)
+
+
+def non_local_means(img, h):
+    return cv.fastNlMeansDenoising(img, h=h, templateWindowSize=7, searchWindowSize=21)
 
 
 def bilateral_filter(img, sigma_c: float, sigma_s: float, steps: int=0):
