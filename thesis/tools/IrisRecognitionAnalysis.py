@@ -66,7 +66,7 @@ plt.plot(xs, inter_y)
 plt.plot(xs, intra_y)
 st.pyplot()
 
-thresholds = np.linspace(start, stop, 30)
+thresholds = np.linspace(start, stop, 100)
 far = []
 frr = []
 far_est = []
