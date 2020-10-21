@@ -42,9 +42,7 @@ def polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_step
     output = np.zeros((radial_resolution, angular_resolution), np.uint8)
     output_mask = np.zeros((radial_resolution, angular_resolution), np.uint8)
 
-    n_samples = 30
-    random_thetas_seed = np.random.uniform(0, 1, n_samples)
-    random_radii_seed = np.random.uniform(0, 1, n_samples)
+    n_samples = 100
 
     for j in prange(radial_resolution):
         for i in prange(angular_resolution):
@@ -53,6 +51,9 @@ def polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_step
 
             min_radius = min(r_left_1, r_right_1)
             max_radius = max(r_left_2, r_right_2)
+
+            random_thetas_seed = np.random.uniform(0, 1, n_samples)
+            random_radii_seed = np.random.uniform(0, 1, n_samples)
 
             # random_thetas_seed = np.random.uniform(0, 1, n_samples)
             random_thetas = angle_steps[i] + random_thetas_seed * (angle_steps[i + 1] - angle_steps[i])
@@ -121,8 +122,6 @@ def polar_from_ellipses(img: np.ndarray, mask: np.ndarray, angular_resolution: i
         radial_steps = np.linspace(start, stop, radial_resolution + 1 + margin * 2)
         for j, step in enumerate(radial_steps[margin:][:-margin]):
             radii[j, i] = step
-
-    n_samples = 30
 
     # for i, theta in enumerate(angle_steps):
     #     start = intersect_angle(inner, theta)
