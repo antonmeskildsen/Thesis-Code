@@ -211,14 +211,17 @@ def joint__gabor_1d_histogram(img_a, img_b, mask=None, divisions=32):
     return hist_a, hist_b, hist_joint
 
 
-def joint_histogram(img_a, img_b, divisions=32):
-    img_a = cv.equalizeHist(img_a)
-    img_b = cv.equalizeHist(img_b)
+def joint_histogram(img_a, img_b, mask=None, divisions=32):
+    # img_a = cv.equalizeHist(img_a)
+    # img_b = cv.equalizeHist(img_b)
     img_a = np.int32(img_a / img_a.max() * (divisions // 2))
     img_b = np.int32(img_b / img_b.max() * (divisions // 2))
 
     hist_a = np.zeros(divisions)
     hist_b = np.zeros(divisions)
+
+    if mask is None:
+        mask = np.zeros(img_a.shape)
 
     hist_joint = defaultdict(float)
 
@@ -226,13 +229,53 @@ def joint_histogram(img_a, img_b, divisions=32):
     height, width = img_a.shape
     for y in range(height):
         for x in range(width):
-            hist_joint[(img_a[y, x] + offset,
-                        img_b[y, x] + offset)] += 1
-            hist_a[img_a[y, x]] += 1
-            hist_b[img_b[y, x]] += 1
+            if mask[y, x] > 0:
+                hist_joint[(img_a[y, x] + offset,
+                            img_b[y, x] + offset)] += 1
+                hist_a[img_a[y, x] + offset] += 1
+                hist_b[img_b[y, x] + offset] += 1
 
-    joint_sum = height * width
-    assert height * width == sum(hist_joint.values())
+    joint_sum = hist_a.sum()
+    hist_joint = defaultdict(float, {k: v / joint_sum for k, v in hist_joint.items()})
+    hist_a /= hist_a.sum()
+    hist_b /= hist_b.sum()
+
+    return hist_a, hist_b, hist_joint
+
+
+def joint_img_code_histogram(img, code, img_mask=None, code_mask=None, img_divisions=32):
+    img_a = cv.equalizeHist(img)
+    img = np.int32(img / img.max() * (img_divisions // 2))
+
+    xm = dx(img)
+    ym = dy(img)
+
+    # all_max = max(np.abs(xm_a).max(), np.abs(ym_a).max(), np.abs(xm_b).max(), np.abs(ym_b).max())
+    all_max = 1024
+
+    eps = 10e-6
+    xm = np.int16(xm / all_max * (img_divisions // 2 - eps))
+    ym = np.int16(ym / all_max * (img_divisions // 2 - eps))
+
+    hist_a = np.zeros((img_divisions, img_divisions))
+    hist_b = np.zeros(2)
+
+    if mask is None:
+        mask = np.zeros(img_a.shape)
+
+    hist_joint = defaultdict(float)
+
+    offset = (divisions // 2) - 1
+    height, width = img_a.shape
+    for y in range(height):
+        for x in range(width):
+            if mask[y, x] > 0:
+                hist_joint[(img_a[y, x] + offset,
+                            img_b[y, x] + offset)] += 1
+                hist_a[img_a[y, x] + offset] += 1
+                hist_b[img_b[y, x] + offset] += 1
+
+    joint_sum = hist_a.sum()
     hist_joint = defaultdict(float, {k: v / joint_sum for k, v in hist_joint.items()})
     hist_a /= hist_a.sum()
     hist_b /= hist_b.sum()
