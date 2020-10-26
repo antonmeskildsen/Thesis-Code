@@ -1,9 +1,0 @@
-gaze_data:
-  - '/home/anton/data/eyedata/gaze/pattern0'
-
-iris_data:
-  - '/home/anton/data/eyedata/iris/casia4i.json'
-
-optimization:
-  filter_config: bilateral_filter
-  strategy: uniform_sampler
