@@ -21,7 +21,7 @@ import time
 import altair as alt
 
 from thesis.entropy import gradient_histogram, histogram, entropy
-from thesis.segmentation import IrisSegmentation, IrisImage, IrisCodeEncoder
+from thesis.segmentation import IrisSegmentation, IrisImage, SKImageIrisCodeEncoder
 from thesis.entropy import *
 
 """
@@ -63,7 +63,6 @@ st.write(table)
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
 
 st.sidebar.markdown('# Filters')
-tmp_img = IrisImage(seg, img)
 # num = 5000
 # coords = np.random.randint(0, filtered.size, num)
 # height, width = filtered.shape
@@ -116,16 +115,27 @@ filtered2 = filtered.copy()
 
 iris_img = IrisImage(seg, img)
 filter_img = IrisImage(seg, filtered)
+encoder = SKImageIrisCodeEncoder(6, 100, 10, 4, 0.001)
+base_code = encoder.encode(iris_img)
+filter_code = encoder.encode(filter_img)
 
 bins = 50
 div = 64
 
 st.sidebar.markdown('# Functions')
 
+tmp_img = IrisImage(seg, img)
+tmp_fil = IrisImage(seg, filtered)
+
+i_img, _ = tmp_img.to_polar(100, 10)
+i_filtered, _ = tmp_fil.to_polar(100, 10)
+
+st.image([i_img, i_filtered], ['base', 'filtered'])
+
 if st.sidebar.checkbox('Entropy'):
 
-    half_img = img.copy()
-    half_filtered = filtered.copy()
+    half_img = i_img.copy()
+    half_filtered = i_filtered.copy()
     # half_img = cv.pyrDown(img)
     # half_filtered = cv.pyrDown(filtered)
     # half_img = cv.pyrDown(half_img)
@@ -135,7 +145,19 @@ if st.sidebar.checkbox('Entropy'):
     # half_img = cv.pyrDown(half_img)
     # half_filtered = cv.pyrDown(half_filtered)
 
+    bcode = (base_code.code + 1) // 2
+    fcode = (filter_code.code + 1) // 2
+
+    cm = np.uint8(~((base_code.mask == 1) | (filter_code.mask == 1)).reshape((-1, 1)))
+
     mask = cv.resize(iris_img.mask, (half_img.shape[1], half_img.shape[0]), interpolation=cv.INTER_NEAREST)
+    # ha, hb, hjoint = joint_histogram(bcode.reshape((-1, 1)), fcode.reshape((-1, 1)), mask=cm, divisions=2)
+    ha, hb, hjoint = joint_histogram(half_img, half_filtered, mask=mask, divisions=256)
+    # st.write(ha)
+    # st.write(hb)
+    # st.write(str(hjoint))
+    f'ha: {entropy(ha)}, hb: {entropy(hb)}, hjoint: {mutual_information(ha, hb, hjoint)}'
+
 
     # st.image([img, half_img, mask * 255], ['img', 'half', 'mask'])
 
@@ -143,7 +165,11 @@ if st.sidebar.checkbox('Entropy'):
     t = time.perf_counter()
     # img_grad, fil_grad, joint_grad = joint_gabor_histogram(half_img, half_filtered, mask=mask, theta=0,
     #                                                        divisions=d)
-    img_grad, fil_grad, joint_grad = joint_gradient_histogram(half_img, half_filtered, mask, divisions=d)
+    img_grad, fil_grad, joint_grad = joint_gradient_histogram(i_img, i_filtered, divisions=d)
+    # st.write(img_grad)
+    # st.write(fil_grad)
+    # st.write({str(k): v for k, v in joint_grad.items()})
+    # st.write(sum(joint_grad.values()))
     elapsed = time.perf_counter() - t
     f'Elapsed time for gradient histogram: {elapsed:.4f} seconds'
 
@@ -191,7 +217,7 @@ if st.sidebar.checkbox('Entropy'):
     f'Gradient mutual: {m2}'
 
     f'Ratio: {(e - m2) / e * 100:.2f} %'
-    f'Direct: {m2 / e}'
+    f'Direct fraction: {m2 / e}'
 
 if st.sidebar.checkbox('Gabor responses'):
     '# Gabor responses'
