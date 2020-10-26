@@ -1,3 +1,4 @@
+import _thread
 import copy
 from typing import Dict
 
@@ -21,8 +22,7 @@ from tools.st_utils import file_select, type_name, obj_type_name, json_to_strate
 from tools.cli.utilities import load_iris_data, load_gaze_data, load_pupil_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, PopulationInitializer
 from thesis.optim import sampling
-from thesis.optim.filters import bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, salt_and_pepper, \
-    cauchy_noise
+from thesis.optim.filters import *
 from thesis.optim.metrics import GradientEntropy, GaborEntropy, ImageSimilarity, GazeAccuracy, PupilDetectionError
 from thesis.optim import metrics
 from thesis.optim.population import TruncationSelection, TournamentSelection, UniformCrossover, GaussianMutation
@@ -48,11 +48,13 @@ with open(config_file) as config_file:
     config = yaml.safe_load(config_file)
 
 
-@st.cache(hash_funcs={
-    GazeDataset: lambda _: None,
-    PupilDataset: lambda _: None,
-    SegmentationDataset: lambda _: None
-}, allow_output_mutation=True)
+# @st.cache(hash_funcs={
+#     GazeDataset: lambda _: None,
+#     PupilDataset: lambda _: None,
+#     SegmentationDataset: lambda _: None,
+#     _thread.RLock: lambda _: None,
+#     # _thread.lock: lambda _: None,
+# }, allow_output_mutation=True)
 def load_data():
     return load_gaze_data(config['gaze_data']), load_iris_data(config['iris_data']), \
            load_pupil_data(config['pupil_data'])
@@ -94,8 +96,9 @@ pupil_metrics = [PupilDetectionError(**constructor_args['PupilDetectionError'])]
     'Pupil metrics') else []
 
 st.sidebar.markdown('## Filter selection')
-filters = [f for f in (gaussian_filter, bilateral_filter, gaussian_noise, uniform_noise, salt_and_pepper,
-                       cauchy_noise) if st.sidebar.checkbox(f.__name__)]
+filters = [f for f in (
+    gaussian_filter, mean_filter, median_filter, bilateral_filter, anisotropic_diffusion, non_local_means,
+    gaussian_noise, uniform_noise, salt_and_pepper, cauchy_noise) if st.sidebar.checkbox(f.__name__)]
 
 st.sidebar.write(
     """
@@ -260,19 +263,19 @@ if st.button('Start experiment'):
         metrics = pd.DataFrame(metrics_df)
         st.write(metrics)
 
-        if len(gaze_metrics) > 0 and len(iris_metrics) > 0:
-            c = alt.Chart(metrics).mark_point().encode(
-                x=gaze_metrics[0].__name__,
-                y=iris_metrics[0].__name__,
-                color='k:Q'
-            ).interactive()
-
-            c = c + alt.Chart(metrics).mark_line().encode(
-                x=gaze_metrics[0].__name__,
-                y=iris_metrics[0].__name__,
-                color='k:Q'
-            ).transform_filter(alt.datum.pareto).interactive()
-            st.altair_chart(c, use_container_width=True)
+        # if len(gaze_metrics) > 0 and len(iris_metrics) > 0:
+        #     c = alt.Chart(metrics).mark_point().encode(
+        #         x=obj_type_name(gaze_metrics[0]),
+        #         y=obj_type_name(iris_metrics[0]),
+        #         color='k:Q'
+        #     ).interactive()
+        #
+        #     c = c + alt.Chart(metrics).mark_line().encode(
+        #         x=obj_type_name(gaze_metrics[0]),
+        #         y=obj_type_name(iris_metrics[0]),
+        #         color='k:Q'
+        #     ).transform_filter(alt.datum.pareto).interactive()
+        #     st.altair_chart(c, use_container_width=True)
 
     if should_export:
         with open(new_path, 'w') as file:

@@ -107,9 +107,9 @@ def hom(points):
 
 
 class BasicGaze(GazeModel):
-    def __init__(self, screen_width: int, screen_height: int, fov: float, glint_args=None, model: Pipeline = None,
+    def __init__(self, screen_height: int, screen_width: int, fov: float, glint_args=None, model: Pipeline = None,
                  pupil_detector=features.pupil_detector):
-        super().__init__(screen_width, screen_height, fov)
+        super().__init__(screen_height, screen_width, fov)
         if glint_args is None:
             self.glint_args = {}
         else:
@@ -156,7 +156,7 @@ class BasicGaze(GazeModel):
 
     def calibrate(self, images, gaze_positions):
         pupil = self._preprocess(images)
-        norm_pos = features.normalize_coordinates(gaze_positions, 2160, 3840)  # TODO: hardcoded?!
+        norm_pos = features.normalize_coordinates(gaze_positions, self.screen_height, self.screen_width)
         self.model.fit(pupil, norm_pos)
 
     def predict(self, images):

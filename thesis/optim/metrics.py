@@ -125,7 +125,8 @@ class GazeAccuracy(GazeMetric):
         gaze_source = model.predict(sample.image)
         gaze_filtered = model.predict(filtered)
         screen = normalize_coordinates(np.array([sample.screen_position]), model.screen_height,
-                                       model.screen_width)  # TODO: Set resolution!
+                                       model.screen_width)
+
         dist_source = np.linalg.norm(np.array(gaze_source) - np.array(screen))
         dist_filtered = np.linalg.norm(np.array(gaze_filtered) - np.array(screen))
 
