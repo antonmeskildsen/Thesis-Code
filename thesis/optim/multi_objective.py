@@ -98,7 +98,7 @@ class ObfuscationObjective(Objective):
 
         self._metrics = results.columns()
 
-        return results.means()
+        return results
 
     def output_dimensions(self):
         return len(self.iris_terms) + len(self.gaze_terms)
@@ -173,10 +173,7 @@ class PopulationMultiObjectiveOptimizer(MultiObjectiveOptimizer):
 def for_each(args):
     params, objective = args
     output = objective.eval(params)
-    return params, dict(zip(objective.metrics(), output)), 0
-
-
-from tqdm import tqdm
+    return params, output, 0
 
 
 @dataclass

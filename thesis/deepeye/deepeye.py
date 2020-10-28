@@ -229,7 +229,7 @@ class DeepEye:
                 self.prob_mask,
                 feed_dict={self.frame_input: frame})
 
-            prob_mask = prob_mask[0:, :, 0]
+            prob_mask = prob_mask[0, :, :, 0]
         return self.blob_location(prob_mask)
 
     def restart_tracker(self):
