@@ -2,6 +2,7 @@ import streamlit as st
 
 import click
 
+import copy
 import os
 from collections import defaultdict
 import json
@@ -40,13 +41,13 @@ def create_code(args):
 
 
 def compare(args):
-    (left, right), codes, (i, j), num_rotations = args
+    (left, right), codes_left, codes_right, (i, j), num_rotations = args
 
     same = False
     if left.user_id == right.user_id and left.eye == right.eye:
         same = True
 
-    distance = min([codes[i][num_rotations // 2].dist(cb) for cb in codes[j]])
+    distance = min([codes_left[i][num_rotations // 2].dist(cb) for cb in codes_right[j]])
 
     return (i, j), (distance, same)
 
@@ -98,17 +99,6 @@ def main(config, output, filter):
 
         encoder = SKImageIrisCodeEncoder(angles, angular, radial, scales, eps)
 
-        if filter is not None:
-            print('[INFO] Applying filter')
-            args = config['filters'][filter]
-            filter_func = getattr(filters, filter)
-
-            def ffunc(img):
-                return filter_func(img, **args)
-
-            for s in tqdm(dataset.samples):
-                s.image.image = ffunc(s.image.image)
-
         args = list(zip(repeat(encoder), dataset.samples, repeat(num_rotations), repeat(step_size)))
 
         # codes = []
@@ -121,7 +111,26 @@ def main(config, output, filter):
 
         comparisons = list(product(range(n), range(n)))
         comparison_samples = map(lambda v: (dataset.samples[v[0]], dataset.samples[v[1]]), comparisons)
-        args = list(zip(comparison_samples, repeat(codes), comparisons, repeat(num_rotations)))
+
+        if filter is not None:
+            print('[INFO] Applying filter and creating filtered codes')
+            args = config['filters'][filter]
+            filter_func = getattr(filters, filter)
+
+            filter_samples = copy.deepcopy(dataset.samples)
+
+            for s in tqdm(filter_samples):
+                s.image.image = filter_func(s.image.image, **args)
+
+            print('[INFO] creating codes')
+            args = list(zip(repeat(encoder), filter_samples, repeat(num_rotations), repeat(step_size)))
+            f_codes = list(tqdm(map(create_code, args), total=len(dataset)))
+            print('[INFO] codes created')
+            n = len(f_codes)
+
+            args = list(zip(comparison_samples, repeat(codes), repeat(f_codes), comparisons, repeat(num_rotations)))
+        else:
+            args = list(zip(comparison_samples, repeat(codes), repeat(codes), comparisons, repeat(num_rotations)))
         # args = list(zip(repeat(dataset), repeat(codes), range(n), repeat(n), repeat(num_rotations)))
 
         print('[INFO] comparing codes')
