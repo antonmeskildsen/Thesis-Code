@@ -20,8 +20,13 @@ with open(file_path) as file:
 if 'parameters' in data:
     st.write(data['parameters'])
 
-intra_distances = np.array(data['results']['intra_distances'])
-inter_distances = np.array(data['results']['inter_distances'])
+if not 'intra_distances' in data['results']:
+    selected = st.selectbox('Results to show', list(data['results'].keys()))
+    intra_distances = np.array(data['results'][selected]['intra_distance'])
+    inter_distances = np.array(data['results'][selected]['inter_distance'])
+else:
+    intra_distances = np.array(data['results']['intra_distances'])
+    inter_distances = np.array(data['results']['inter_distances'])
 
 clip = st.slider('Clip margin', 0.0, 0.5, 0.01)
 
