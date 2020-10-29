@@ -72,11 +72,34 @@ def compare(args):
 #
 #     return distance_matrix, same_mask
 
+def run_test(args, n):
+    results = list(tqdm(map(compare, args), total=len(args)))
+    distance_matrix = np.zeros((n, n))
+    same_mask = np.zeros((n, n), np.bool)
+    for (i, j), (distance, same) in results:
+        distance_matrix[i, j] = distance
+        same_mask[i, j] = same
+
+    intra_distances = []
+    inter_distances = []
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                continue
+            if same_mask[i, j]:
+                intra_distances.append(distance_matrix[i, j])
+            else:
+                inter_distances.append(distance_matrix[i, j])
+
+    # intra_distances = np.array(intra_distances)
+    # inter_distances = np.array(inter_distances)
+    return inter_distances, intra_distances
+
 
 @click.command()
 @click.argument('config')
 @click.argument('output')
-@click.option('--filter', help='Apply filter configuration')
+@click.option('--filter', '-f', is_flag=True, help='Apply filter configuration')
 def main(config, output, filter):
     with open(os.path.join('configs/iris_recognition', f'{config}.yaml')) as file:
         config = yaml.safe_load(file)
@@ -110,81 +133,47 @@ def main(config, output, filter):
         n = len(codes)
 
         comparisons = list(product(range(n), range(n)))
-        comparison_samples = map(lambda v: (dataset.samples[v[0]], dataset.samples[v[1]]), comparisons)
+        comparison_samples = list(map(lambda v: (dataset.samples[v[0]], dataset.samples[v[1]]), comparisons))
 
-        if filter is not None:
-            print('[INFO] Applying filter and creating filtered codes')
-            args = config['filters'][filter]
-            filter_func = getattr(filters, filter)
+        res = {}
+        if filter:
+            for f in config['filters']:
 
-            filter_samples = copy.deepcopy(dataset.samples)
+                print('[INFO] Applying filter and creating filtered codes')
+                args = config['filters'][f]
+                filter_func = getattr(filters, f)
 
-            for s in tqdm(filter_samples):
-                s.image.image = filter_func(s.image.image, **args)
+                filter_samples = copy.deepcopy(dataset.samples)
 
-            print('[INFO] creating codes')
-            args = list(zip(repeat(encoder), filter_samples, repeat(num_rotations), repeat(step_size)))
-            f_codes = list(tqdm(map(create_code, args), total=len(dataset)))
-            print('[INFO] codes created')
-            n = len(f_codes)
+                for s in tqdm(filter_samples):
+                    s.image.image = filter_func(s.image.image, **args)
 
-            args = list(zip(comparison_samples, repeat(codes), repeat(f_codes), comparisons, repeat(num_rotations)))
-        else:
-            args = list(zip(comparison_samples, repeat(codes), repeat(codes), comparisons, repeat(num_rotations)))
-        # args = list(zip(repeat(dataset), repeat(codes), range(n), repeat(n), repeat(num_rotations)))
+                print('[INFO] creating codes')
+                args = list(zip(repeat(encoder), filter_samples, repeat(num_rotations), repeat(step_size)))
+                f_codes = list(tqdm(map(create_code, args), total=len(dataset)))
+                print('[INFO] codes created')
+                n = len(f_codes)
 
-        print('[INFO] comparing codes')
+                args = list(zip(comparison_samples, repeat(codes), repeat(f_codes), comparisons, repeat(num_rotations)))
+                inter_distance, intra_distances = run_test(args, n)
+                res[f] = {
+                    'inter_distance': inter_distance,
+                    'intra_distance': intra_distances
+                }
+            print('[INFO] Filter comparisons done')
 
-        # results = list(tqdm(map(create_row, args), n))
-        results = list(tqdm(map(compare, args), total=len(args)))
-        distance_matrix = np.zeros((n, n))
-        same_mask = np.zeros((n, n), np.bool)
-        for (i, j), (distance, same) in results:
-            distance_matrix[i, j] = distance
-            same_mask[i, j] = same
-
-        # pool.close()
-        # pool.join()
-        # distances, masks = zip(*results)
-
-        # distance_matrix = np.vstack(distances)
-        # same_mask = np.vstack(masks)
-
-        # for i in tqdm(range(n), total=n):
-        #     for j in range(n):
-        #         in_data = dataset.samples
-        #         info_i = in_data[i]
-        #         info_j = in_data[j]
-        #         same = False
-        #         if info_i.user_id == info_j.user_id and info_i.eye == info_j.eye:
-        #             same = True
-        #             same_mask[i, j] = True
-        #
-        #         if same or random.random() < 2:  # Rate
-        #             num_samples += 1
-        #             distance_matrix[i, j] = min([codes[i][num_rotations // 2].dist(cb) for cb in codes[j]])
-
-        intra_distances = []
-        inter_distances = []
-        for i in range(n):
-            for j in range(n):
-                if i == j:
-                    continue
-                if same_mask[i, j]:
-                    intra_distances.append(distance_matrix[i, j])
-                else:
-                    inter_distances.append(distance_matrix[i, j])
-
-        intra_distances = np.array(intra_distances)
-        inter_distances = np.array(inter_distances)
+        print('[INFO] comparing base codes')
+        args = list(zip(comparison_samples, repeat(codes), repeat(codes), comparisons, repeat(num_rotations)))
+        inter_distance, intra_distances = run_test(args, n)
+        res['baseline'] = {
+            'inter_distance': inter_distance,
+            'intra_distance': intra_distances
+        }
 
         with open(os.path.join('results', 'recognition', f'{output}.json'), 'w') as file:
             json.dump({
                 'config': config,
-                'results': {
-                    'intra_distances': list(intra_distances),
-                    'inter_distances': list(inter_distances),
-                }
+                'results': res
             }, file)
 
 
