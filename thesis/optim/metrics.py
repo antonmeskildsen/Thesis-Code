@@ -8,7 +8,7 @@ import cv2 as cv
 import numpy as np
 from pupilfit import fit_else, fit_excuse
 
-from thesis.data import GazeImage, PupilSample
+from thesis.data import GazeImage, PupilSample, deepeye_ref
 from thesis.entropy import joint_gradient_histogram, entropy, mutual_information_grad, joint_gabor_histogram
 from thesis.tracking.gaze import GazeModel
 from thesis.tracking.features import normalize_coordinates, pupil_detector
@@ -26,6 +26,12 @@ class Logger:
 
     def add(self, point: str, value: float):
         self.data[point].append(value)
+
+    def list_form(self):
+        res = []
+        for i in range(len(next(iter(self.data)))):
+            res.append({k: v[i] for k, v in self.data.items()})
+        return res
 
     def columns(self):
         return list(self.data.keys())
@@ -154,17 +160,26 @@ class BaseDetector(PupilDetector):
 
 
 class ElseDetector(PupilDetector):
-    name = 'base'
+    name = 'else'
 
     def __call__(self, image: np.ndarray) -> (float, float):
         return fit_else(image)[0]
 
 
 class ExcuseDetector(PupilDetector):
-    name = 'base'
+    name = 'excuse'
 
     def __call__(self, image: np.ndarray) -> (float, float):
         return fit_excuse(image)[0]
+
+
+class DeepEyeDetector(PupilDetector):
+    name = 'deep_eye'
+
+    def __call__(self, image: np.ndarray) -> (float, float):
+        image = np.uint8(image)
+        cy, cx, _, _, _ = deepeye_ref(image)
+        return cx, cy
 
 
 class PupilDetectionError(PupilMetric):

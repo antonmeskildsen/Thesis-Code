@@ -26,7 +26,7 @@ def samples_step(start, stop, step=1, *, stratified=True):
     Returns:
 
     """
-    nums = np.arange(start, stop, step)
+    nums = np.arange(start, stop, step, dtype=int)
     # if stratified:
     #     nums = nums + (np.random.random(len(nums)) * step - step * 0.5)
     return nums

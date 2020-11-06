@@ -15,7 +15,7 @@ from thesis.optim import multi_objective
 from thesis.optim import filters
 from thesis.optim import metrics
 from thesis.tools.cli.utilities import load_gaze_data, load_iris_data, load_pupil_data
-from thesis.tools.st_utils import json_to_strategy, obj_type_name
+from thesis.tools.st_utils import json_to_strategy, obj_type_name, NpEncoder
 
 
 def progress_tqdm(iterator, total):
@@ -98,11 +98,12 @@ def main(config, name):
 
         for filter_name, o in optimizers.items():
             dmetrics = o.metrics()
-            pareto = [o.pareto_frontier(k) for k in range(max([m[2] for m in dmetrics]) + 1)]
+            # pareto = [o.pareto_frontier(k) for k in range(max([m[2] for m in dmetrics]) + 1)]
 
-            dmetrics_df = [{**a, **b, 'pareto': i in pareto[generations], 'filter': filter_name, 'k': generations} for
-                           i, (a, b, generations) in
-                           enumerate(dmetrics)]
+            dmetrics_df = []
+            for i, (a, b, generations) in enumerate(dmetrics):
+                for line in b.list_form():
+                    dmetrics_df.append({**a, **line, 'filter': filter_name, 'k': generations, 'group': i})
             results.extend(dmetrics_df)
             # results[filter_name] = metrics_df
             dmetrics = pd.DataFrame(dmetrics_df)
@@ -116,7 +117,7 @@ def main(config, name):
                 },
                 # 'metrics': metrics,
                 'results': results
-            }, f2)
+            }, f2, cls=NpEncoder)
 
 
 if __name__ == '__main__':

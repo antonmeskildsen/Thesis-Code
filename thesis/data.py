@@ -55,6 +55,7 @@ class GazeDataset:
 
             model = BasicGaze(data['screen']['res-y'], data['screen']['res-x'], data['fov'],
                               pupil_detector=deepeye_ref)
+            print(data['fov'])
             images = [s.image for s in calibration_samples]
             gaze_positions = [s.screen_position for s in calibration_samples]
             model.calibrate(images, gaze_positions)

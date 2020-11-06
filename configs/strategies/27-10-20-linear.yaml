@@ -1,11 +1,10 @@
 gaussian_filter:
   sigma:
-    type: samples_exp
+    type: samples_num
     params:
       start: 0
       stop: 50
       num: 100
-      exp: 100
 
 
 mean_filter:
@@ -43,19 +42,17 @@ bilateral_filter:
 
 anisotropic_diffusion:
   kappa:
-    type: samples_exp
+    type: samples_num
     params:
       start: 20
       stop: 80
       num: 30
-      exp: 100
   gamma:
-    type: samples_exp
+    type: samples_num
     params:
       start: 0.01
       stop: 0.25
       num: 30
-      exp: 100
   iterations:
     type: const
     params:
@@ -64,22 +61,20 @@ anisotropic_diffusion:
 
 non_local_means:
   h:
-    type: samples_exp
+    type: samples_num
     params:
       start: 0
       stop: 100
       num: 100
-      exp: 100
 
 
 uniform_noise:
   intensity:
-    type: samples_exp
+    type: samples_num
     params:
       start: 0
       stop: 250
       num: 100
-      exp: 100
 
 
 gaussian_noise:
@@ -88,36 +83,32 @@ gaussian_noise:
     params:
       val: 0.0
   scale:
-    type: samples_exp
+    type: samples_num
     params:
       start: 0
       stop: 100
       num: 100
-      exp: 100
 
 
 salt_and_pepper:
   intensity:
-    type: samples_exp
+    type: samples_num
     params:
       start: 0
       stop: 100
-      num: 30
-      exp: 100
+      num: 15
   density:
-    type: samples_exp
+    type: samples_num
     params:
       start: 0.01
       stop: 0.99
-      num: 30
-      exp: 100
+      num: 15
 
 
 cauchy_noise:
   scale:
-    type: samples_exp
+    type: samples_num
     params:
       start: 1
       stop: 50
       num: 100
-      exp: 100
