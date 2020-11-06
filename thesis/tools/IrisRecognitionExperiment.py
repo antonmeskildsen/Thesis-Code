@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 
 
 from thesis.optim.filters import mean_filter, anisotropic_diffusion, bilateral_filter, gaussian_filter, uniform_noise, \
-    gaussian_noise, cauchy_noise, salt_and_pepper
+    gaussian_noise, cauchy_noise, salt_and_pepper, non_local_means
 
 from thesis.segmentation import IrisImage, IrisSegmentation, IrisCodeEncoder, IrisCode, SKImageIrisCodeEncoder
 from thesis.tools.st_utils import type_name
@@ -262,7 +262,7 @@ if st.checkbox('Stats'):
 # Filter configuration
 """
 ftypes = [func for func in (
-    mean_filter, anisotropic_diffusion, bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, cauchy_noise,
+    mean_filter, anisotropic_diffusion, non_local_means, bilateral_filter, gaussian_filter, uniform_noise, gaussian_noise, cauchy_noise,
     salt_and_pepper) if st.checkbox(func.__name__)]
 
 filters = {}
