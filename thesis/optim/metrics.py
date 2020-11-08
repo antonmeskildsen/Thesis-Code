@@ -125,7 +125,7 @@ class GaborEntropy(IrisMetric):
 
 
 class GazeAccuracy(GazeMetric):
-    columns = ['gaze_angle_error_source', 'gaze_angle_error_filtered']
+    columns = ['gaze_angle_error_source', 'gaze_aongle_error_filtered']
 
     def log(self, results: Logger, model: GazeModel, sample: GazeImage, filtered: np.ndarray):
         gaze_source = model.predict(sample.image)
