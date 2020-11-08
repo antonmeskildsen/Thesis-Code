@@ -38,11 +38,9 @@ def linear_interpolation(start: (float, float), stop: (float, float), num: int) 
 
 
 @jit(nopython=True, parallel=True, error_model='numpy')
-def polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_steps, radii, cx, cy):
+def polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_steps, radii, cx, cy, n_samples=100):
     output = np.zeros((radial_resolution, angular_resolution), np.uint8)
     output_mask = np.zeros((radial_resolution, angular_resolution), np.uint8)
-
-    n_samples = 100
 
     for j in prange(radial_resolution):
         for i in prange(angular_resolution):
@@ -52,8 +50,14 @@ def polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_step
             min_radius = min(r_left_1, r_right_1)
             max_radius = max(r_left_2, r_right_2)
 
-            random_thetas_seed = np.random.uniform(0, 1, n_samples)
-            random_radii_seed = np.random.uniform(0, 1, n_samples)
+            side_len = int(np.sqrt(n_samples))
+            # random_thetas_seed = np.random.uniform(0, 1, n_samples)
+            # random_radii_seed = np.random.uniform(0, 1, n_samples)
+            random_thetas_seed = np.linspace(0, 1, side_len).repeat(side_len)
+            random_radii_seed = np.zeros(side_len**2)
+            for x in range(side_len):
+                random_radii_seed[x:x+1] = x/side_len
+
 
             # random_thetas_seed = np.random.uniform(0, 1, n_samples)
             random_thetas = angle_steps[i] + random_thetas_seed * (angle_steps[i + 1] - angle_steps[i])
@@ -95,7 +99,7 @@ def polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_step
 
 @jit(nopython=True, parallel=True, error_model='numpy')
 def polar_from_ellipses(img: np.ndarray, mask: np.ndarray, angular_resolution: int, radial_resolution: int, inner,
-                        outer, start_angle=0) -> (
+                        outer, start_angle=0, n_samples=100) -> (
         np.ndarray, np.ndarray):
     """Create polar image.
 
@@ -146,7 +150,7 @@ def polar_from_ellipses(img: np.ndarray, mask: np.ndarray, angular_resolution: i
     #
 
     return polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_steps, radii, inner[0][0],
-                           inner[0][1])
+                           inner[0][1], n_samples)
 
 
 @dataclass
@@ -205,7 +209,7 @@ class IrisImage:
         image = cv.imread(data['image'])
         return IrisImage(segmentation, image)
 
-    def to_polar(self, angular_resolution, radial_resolution, start_angle=0) -> (np.ndarray, np.ndarray):
+    def to_polar(self, angular_resolution, radial_resolution, start_angle=0, n_samples=100) -> (np.ndarray, np.ndarray):
         """Create polar image.
 
         Args:
@@ -221,7 +225,7 @@ class IrisImage:
                 or self.polar is None:
             self.polar = polar_from_ellipses(self.image, self.mask, angular_resolution, radial_resolution,
                                              self.segmentation.inner.as_tuple(), self.segmentation.outer.as_tuple(),
-                                             start_angle)
+                                             start_angle, n_samples)
 
         return self.polar
 
@@ -260,11 +264,13 @@ class IrisCodeEncoder:
                  radial_resolution=10,
                  wavelength_base=0.5,
                  mult=1.41,
-                 eps=0.01):
+                 eps=0.01,
+                 n_samples=100):
         self.kernels = []
         self.angular_resolution = angular_resolution
         self.radial_resolution = radial_resolution
         self.eps = eps
+        self.n_samples = 100
         wavelength = wavelength_base
         for s in range(scales):
             sigma = wavelength / 0.5
@@ -281,7 +287,7 @@ class IrisCodeEncoder:
             wavelength *= mult
 
     def encode(self, image, start_angle=0):
-        polar, polar_mask = image.to_polar(self.angular_resolution, self.radial_resolution, start_angle)
+        polar, polar_mask = image.to_polar(self.angular_resolution, self.radial_resolution, start_angle, self.n_samples)
         polar = cv.equalizeHist(polar)
         polar = np.float64(polar)
         res = []
@@ -303,12 +309,14 @@ class SKImageIrisCodeEncoder:
                  angular_resolution=20,
                  radial_resolution=10,
                  scales=6,
-                 eps=0.01):
+                 eps=0.01,
+                 n_samples=100):
         self.angular_resolution = angular_resolution
         self.radial_resolution = radial_resolution
         self.eps = eps
         self.scales = scales
         self.kernels = []
+        self.n_samples = n_samples
         for theta in range(0, angles):
             a = theta / angles * np.pi / 2
             kernel = gabor_kernel(1 / 3, a, bandwidth=1)
@@ -351,5 +359,5 @@ class SKImageIrisCodeEncoder:
         return IrisCode(np.array(res), np.array(mask))
 
     def encode(self, image, start_angle=0):
-        polar, polar_mask = image.to_polar(self.angular_resolution, self.radial_resolution, start_angle)
+        polar, polar_mask = image.to_polar(self.angular_resolution, self.radial_resolution, start_angle, self.n_samples)
         return self.encode_raw(polar, polar_mask)
