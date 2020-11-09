@@ -21,15 +21,15 @@ import time
 import altair as alt
 
 from thesis.entropy import gradient_histogram, histogram, entropy
-from thesis.segmentation import IrisSegmentation, IrisImage, IrisCodeEncoder
+from thesis.segmentation import IrisSegmentation, IrisImage, SKImageIrisCodeEncoder
 from thesis.entropy import *
 
 """
 # Entropy Test Lab
 """
 
-base = '/home/anton/data/eyedata/iris'
-# base = '/Users/Anton/Desktop/data/iris'
+# base = '/home/anton/data/eyedata/iris'
+base = '/Users/Anton/Desktop/data/iris'
 
 files = glob(os.path.join(base, '*.json'))
 names = [os.path.basename(p).split('.')[0] for p in files]
@@ -55,15 +55,14 @@ img = cv.imread(sample['image'], cv.IMREAD_GRAYSCALE)
 ints = 100
 filtered = img.copy()
 
-radius_inner = np.sqrt(seg.inner.axes.x**2 + seg.inner.axes.y**2)
-radius_outer = np.sqrt(seg.outer.axes.x**2 + seg.outer.axes.y**2)
+radius_inner = np.sqrt(seg.inner.axes.x ** 2 + seg.inner.axes.y ** 2)
+radius_outer = np.sqrt(seg.outer.axes.x ** 2 + seg.outer.axes.y ** 2)
 
 table = pd.DataFrame([radius_inner, radius_outer], ['Radius inner', 'Radius outer'])
 st.write(table)
 # filtered = np.uint8(np.random.uniform(0, 255, img.shape))
 
 st.sidebar.markdown('# Filters')
-tmp_img = IrisImage(seg, img)
 # num = 5000
 # coords = np.random.randint(0, filtered.size, num)
 # height, width = filtered.shape
@@ -76,7 +75,7 @@ tmp_img = IrisImage(seg, img)
 #     filtered[:, x * s:(x + 1) * s] += 35
 # filtered = np.uint8(np.clip(filtered, 0, 255))
 if st.sidebar.checkbox('Uniform noise'):
-    intensity = st.sidebar.number_input('Intensity', 0, 255, 10)
+    intensity = st.sidebar.number_input('Intensity', 0, 1000, 10)
     filtered = np.uint8(np.clip(img + np.random.uniform(-intensity // 2, intensity // 2, img.shape), 0, 255))
 
 rng = np.random.default_rng()
@@ -116,16 +115,26 @@ filtered2 = filtered.copy()
 
 iris_img = IrisImage(seg, img)
 filter_img = IrisImage(seg, filtered)
+encoder = SKImageIrisCodeEncoder(6, 100, 10, 4, 0.001, n_samples=100)
+base_code = encoder.encode(iris_img)
+filter_code = encoder.encode(filter_img)
 
 bins = 50
 div = 64
 
 st.sidebar.markdown('# Functions')
 
+tmp_img = IrisImage(seg, img)
+tmp_fil = IrisImage(seg, filtered)
+
+i_img, _ = tmp_img.to_polar(100, 10, n_samples=100)
+i_filtered, _ = tmp_fil.to_polar(100, 10, n_samples=10000)
+st.image([i_img, i_filtered], ['base', 'filtered'])
+
 if st.sidebar.checkbox('Entropy'):
 
-    half_img = img.copy()
-    half_filtered = filtered.copy()
+    half_img = i_img.copy()
+    half_filtered = i_filtered.copy()
     # half_img = cv.pyrDown(img)
     # half_filtered = cv.pyrDown(filtered)
     # half_img = cv.pyrDown(half_img)
@@ -135,7 +144,18 @@ if st.sidebar.checkbox('Entropy'):
     # half_img = cv.pyrDown(half_img)
     # half_filtered = cv.pyrDown(half_filtered)
 
+    bcode = (base_code.code + 1) // 2
+    fcode = (filter_code.code + 1) // 2
+
+    cm = np.uint8(~((base_code.mask == 1) | (filter_code.mask == 1)).reshape((-1, 1)))
+
     mask = cv.resize(iris_img.mask, (half_img.shape[1], half_img.shape[0]), interpolation=cv.INTER_NEAREST)
+    # ha, hb, hjoint = joint_histogram(bcode.reshape((-1, 1)), fcode.reshape((-1, 1)), mask=cm, divisions=2)
+    ha, hb, hjoint = joint_histogram(half_img, half_filtered, mask=mask, divisions=256)
+    # st.write(ha)
+    # st.write(hb)
+    # st.write(str(hjoint))
+    f'ha: {entropy(ha)}, hb: {entropy(hb)}, hjoint: {mutual_information(ha, hb, hjoint)}'
 
     # st.image([img, half_img, mask * 255], ['img', 'half', 'mask'])
 
@@ -143,7 +163,11 @@ if st.sidebar.checkbox('Entropy'):
     t = time.perf_counter()
     # img_grad, fil_grad, joint_grad = joint_gabor_histogram(half_img, half_filtered, mask=mask, theta=0,
     #                                                        divisions=d)
-    img_grad, fil_grad, joint_grad = joint_gradient_histogram(half_img, half_filtered, mask, divisions=d)
+    img_grad, fil_grad, joint_grad = joint_gradient_histogram(i_img, i_filtered, divisions=d)
+    # st.write(img_grad)
+    # st.write(fil_grad)
+    # st.write({str(k): v for k, v in joint_grad.items()})
+    # st.write(sum(joint_grad.values()))
     elapsed = time.perf_counter() - t
     f'Elapsed time for gradient histogram: {elapsed:.4f} seconds'
 
@@ -156,9 +180,22 @@ if st.sidebar.checkbox('Entropy'):
     cbar_ticks_fil = [math.pow(10, i) for i in
                       range(math.floor(math.log10(fil_grad.min() + eps)), 1 + math.ceil(math.log10(fil_grad.max())))]
 
-    fig, ax = plt.subplots(2, 1)
-    sns.heatmap(img_grad, ax=ax[0], norm=log_norm_img, cbar_kws={'ticks': cbar_ticks_img})
-    sns.heatmap(fil_grad, ax=ax[1], norm=log_norm_fil, cbar_kws={'ticks': cbar_ticks_fil})
+    fig, ax = plt.subplots(1, 2, figsize=(10, 6))
+    lbs = np.arange(-d//2, d//2, 1)
+    sns.heatmap(img_grad,
+                ax=ax[0],
+                norm=log_norm_img,
+                cbar_kws={'ticks': cbar_ticks_img},
+                xticklabels=lbs, yticklabels=np.flip(lbs),
+                # linewidths=1,
+                square=True)
+    sns.heatmap(fil_grad,
+                ax=ax[1],
+                norm=log_norm_fil,
+                cbar_kws={'ticks': cbar_ticks_img},
+                xticklabels=lbs, yticklabels=np.flip(lbs),
+                # linewidths=1,
+                square=True)
     st.pyplot(fig)
 
     e = entropy(img_grad)
@@ -191,7 +228,7 @@ if st.sidebar.checkbox('Entropy'):
     f'Gradient mutual: {m2}'
 
     f'Ratio: {(e - m2) / e * 100:.2f} %'
-    f'Direct: {m2 / e}'
+    f'Direct fraction: {m2 / e}'
 
 if st.sidebar.checkbox('Gabor responses'):
     '# Gabor responses'
@@ -253,13 +290,13 @@ if st.sidebar.checkbox('Effectiveness'):
     pfil, _ = iris_filtered.to_polar(angular, radial)
 
     '## Polar images'
-    st.image([pimg, pfil, pmask*255], ['original', 'filtered', 'mask'])
+    st.image([pimg, pfil, pmask * 255], ['original', 'filtered', 'mask'])
 
     hist_pimg, hist_pfil, hist_joint = joint_gradient_histogram(pimg, pfil, pmask, divisions=divisions)
 
     pimg_ent = entropy(hist_pimg)
     pfil_ent = entropy(hist_pfil)
     joint_ent = mutual_information_grad(hist_pimg, hist_pfil, hist_joint)
-    table = pd.DataFrame([pimg_ent, pfil_ent, joint_ent, joint_ent/pimg_ent],
+    table = pd.DataFrame([pimg_ent, pfil_ent, joint_ent, joint_ent / pimg_ent],
                          ['Original entropy', 'Filtered entropy', 'Mutual information', 'Ratio'])
     st.write(table)
