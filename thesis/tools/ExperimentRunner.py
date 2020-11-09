@@ -23,7 +23,7 @@ from tools.cli.utilities import load_iris_data, load_gaze_data, load_pupil_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, PopulationInitializer
 from thesis.optim import sampling
 from thesis.optim.filters import *
-from thesis.optim.metrics import GradientEntropy, GaborEntropy, ImageSimilarity, GazeAccuracy, PupilDetectionError
+from thesis.optim.metrics import GradientEntropyIris, GaborEntropyIris, GradientEntropyImage, GaborEntropyImage, ImageSimilarity, GazeAccuracy, PupilDetectionError
 from thesis.optim import metrics
 from thesis.optim.population import TruncationSelection, TournamentSelection, UniformCrossover, GaussianMutation
 
@@ -88,9 +88,11 @@ with open(config_metrics_file) as config_metrics:
 
 constructor_args = config_metrics['constructor_args']
 
-possible_iris_metrics = (GradientEntropy, GaborEntropy, ImageSimilarity)
+possible_iris_metrics = (GradientEntropyIris, GaborEntropyIris, ImageSimilarity)
+possible_image_metrics = (GradientEntropyImage, GaborEntropyImage)
 # iris_metrics_mask = [st.sidebar.checkbox(m.__name__) for m in possible_iris_metrics]
 iris_metrics = [T(**constructor_args[T.__name__]) for T in possible_iris_metrics if st.sidebar.checkbox(T.__name__)]
+image_metrics = [T(**constructor_args[T.__name__]) for T in possible_image_metrics if st.sidebar.checkbox(T.__name__)]
 gaze_metrics = [GazeAccuracy()] if st.sidebar.checkbox('Gaze metrics') else []
 pupil_metrics = [PupilDetectionError(**constructor_args['PupilDetectionError'])] if st.sidebar.checkbox(
     'Pupil metrics') else []
@@ -139,7 +141,7 @@ if method == NaiveMultiObjectiveOptimizer:
     sampling = st.sidebar.selectbox('Sampling technique', (GridSearch, UniformSampler), format_func=type_name)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_metrics, gaze_metrics,
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_metrics, image_metrics, gaze_metrics,
                                          pupil_metrics, iris_samples, gaze_samples, pupil_samples, (radial, angular))
         params, generators = json_to_strategy(config[f.__name__])
         # for p, g in zip(params, generators):
@@ -167,7 +169,7 @@ elif method == PopulationMultiObjectiveOptimizer:
     projected_iterations = iterations * pop_num * len(filters)
 
     for f in filters:
-        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_metrics, gaze_metrics,
+        objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_metrics, image_metrics, gaze_metrics,
                                          pupil_metrics, iris_samples, gaze_samples, pupil_samples, (radial, angular))
         init = PopulationInitializer(*make_strategy(config[f.__name__], pop_num))
 
@@ -198,6 +200,7 @@ if st.button('Export'):
         'metrics_config': config_metrics_file,
         'metrics': {
             'iris_metrics': list(map(obj_type_name, iris_metrics)),
+            'image_metrics': list(map(obj_type_name, image_metrics)),
             'gaze_metrics': list(map(obj_type_name, gaze_metrics)),
             'pupil_metrics': list(map(obj_type_name, pupil_metrics))
         },

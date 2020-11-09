@@ -23,7 +23,6 @@ with open(file_path) as file:
     results = json.load(file)
 
 frame = pd.DataFrame(results['results'])
-# frame['gaze_relative_error'] = frame['gaze_angle_error_filtered'] / frame['gaze_angle_error_source']
 
 
 # frame['pupil_relative_error'] = frame[]
@@ -42,6 +41,8 @@ agg = aggregate(frame, method)
 
 agg['gaze_relative_error'] = agg['gaze_angle_error_filtered'] / agg['gaze_angle_error_source']
 agg = agg[agg['gaze_relative_error'] < gaze_t]
+
+frame['gaze_relative_error'] = frame['gaze_angle_error_filtered'] / frame['gaze_angle_error_source']
 
 st.sidebar.write("# Display settings")
 x = st.sidebar.selectbox('X-axis', agg.columns, index=0)
