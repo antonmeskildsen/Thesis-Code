@@ -90,19 +90,37 @@ gaussian_noise:
       num: 100
 
 
+laplacian_noise:
+  scale:
+    type: samples_num
+    params:
+      start: 0
+      stop: 100
+      num: 100
+
+
 salt_and_pepper:
   intensity:
     type: samples_num
     params:
       start: 0
-      stop: 100
-      num: 15
+      stop: 255
+      num: 30
   density:
     type: samples_num
     params:
       start: 0.01
       stop: 0.99
       num: 15
+
+
+snow:
+  density:
+    type: samples_num
+    params:
+      start: 0.01
+      stop: 0.99
+      num: 100
 
 
 cauchy_noise:
