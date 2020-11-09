@@ -50,6 +50,16 @@ class IrisMetric(ABC):
         ...
 
 
+class ImageMetric(ABC):
+    @property
+    def columns(self):
+        ...
+
+    @abstractmethod
+    def log(self, results: Logger, image, filtered, mask):
+        ...
+
+
 class GazeMetric(ABC):
     @property
     def columns(self):
@@ -70,7 +80,7 @@ class PupilMetric(ABC):
         ...
 
 
-class GradientEntropy(IrisMetric):
+class GradientEntropyIris(IrisMetric):
     columns = ['gradient_entropy_source', 'gradient_entropy_filtered', 'gradient_mutual_information']
 
     def __init__(self, histogram_divisions):
@@ -88,15 +98,15 @@ class GradientEntropy(IrisMetric):
         results.add('gradient_mutual_information', mutual_information)
 
 
-class GaborEntropy(IrisMetric):
+class GaborEntropyIris(IrisMetric):
     def __init__(self, scales, angles_per_scale, histogram_divisions):
         self.scales = scales
         self.angles_per_scale = angles_per_scale
         self.histogram_divisions = histogram_divisions
 
         self._columns = list(chain.from_iterable([
-            [f'gabor_entropy_source_{1 / 2**scale}x', f'gabor_entropy_filtered_{1 / 2**scale}x',
-             f'gabor_mutual_information_{1 / 2**scale}x']
+            [f'gabor_entropy_iris_source_{1 / 2 ** scale}x', f'gabor_entropy_iris_filtered_{1 / 2 ** scale}x',
+             f'gabor_mutual_iris_information_{1 / 2 ** scale}x']
             for scale in range(self.scales)
         ]))
 
@@ -105,7 +115,8 @@ class GaborEntropy(IrisMetric):
         return self._columns
 
     def log(self, results: Logger, polar_image, polar_filtered, mask):
-        angles = np.linspace(0, np.pi - np.pi/self.angles_per_scale, self.angles_per_scale)  # TODO: Consider subtracting small amount
+        angles = np.linspace(0, np.pi - np.pi / self.angles_per_scale,
+                             self.angles_per_scale)  # TODO: Consider subtracting small amount
         for scale in range(self.scales):
             for theta in angles:
                 hist_source, hist_filtered, hist_joint = joint_gabor_histogram(polar_image, polar_filtered, mask,
@@ -115,13 +126,68 @@ class GaborEntropy(IrisMetric):
                 entropy_filtered = entropy(hist_filtered)
                 mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
 
-                results.add(f'gabor_entropy_source_{1 / 2**scale}x', entropy_source)
-                results.add(f'gabor_entropy_filtered_{1 / 2**scale}x', entropy_filtered)
-                results.add(f'gabor_mutual_information_{1 / 2**scale}x', mutual_information)
+                results.add(f'gabor_entropy_iris_source_{1 / 2 ** scale}x', entropy_source)
+                results.add(f'gabor_entropy_iris_filtered_{1 / 2 ** scale}x', entropy_filtered)
+                results.add(f'gabor_mutual_iris_information_{1 / 2 ** scale}x', mutual_information)
 
             polar_image = cv.pyrDown(polar_image)
             polar_filtered = cv.pyrDown(polar_filtered)
             mask = cv.resize(mask, (polar_image.shape[1], polar_image.shape[0]), interpolation=cv.INTER_NEAREST)
+
+
+class GradientEntropyImage(ImageMetric):
+    columns = ['gradient_entropy_source', 'gradient_entropy_filtered', 'gradient_mutual_information']
+
+    def __init__(self, histogram_divisions):
+        self.histogram_divisions = histogram_divisions
+
+    def log(self, results: Logger, image, filtered, mask):
+        hist_source, hist_filtered, hist_joint = joint_gradient_histogram(image, filtered, mask,
+                                                                          self.histogram_divisions)
+        entropy_source = entropy(hist_source)
+        entropy_filtered = entropy(hist_filtered)
+        mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
+
+        results.add('gradient_entropy_image_source', entropy_source)
+        results.add('gradient_entropy_image_filtered', entropy_filtered)
+        results.add('gradient_mutual_image_information', mutual_information)
+
+
+class GaborEntropyImage(ImageMetric):
+    def __init__(self, scales, angles_per_scale, histogram_divisions):
+        self.scales = scales
+        self.angles_per_scale = angles_per_scale
+        self.histogram_divisions = histogram_divisions
+
+        self._columns = list(chain.from_iterable([
+            [f'gabor_entropy_image_source_{1 / 2 ** scale}x', f'gabor_entropy_image_filtered_{1 / 2 ** scale}x',
+             f'gabor_mutual_image_information_{1 / 2 ** scale}x']
+            for scale in range(self.scales)
+        ]))
+
+    @property
+    def columns(self):
+        return self._columns
+
+    def log(self, results: Logger, image, filtered, mask):
+        angles = np.linspace(0, np.pi - np.pi / self.angles_per_scale,
+                             self.angles_per_scale)  # TODO: Consider subtracting small amount
+        for scale in range(self.scales):
+            for theta in angles:
+                hist_source, hist_filtered, hist_joint = joint_gabor_histogram(image, filtered, mask,
+                                                                               theta, self.histogram_divisions)
+
+                entropy_source = entropy(hist_source)
+                entropy_filtered = entropy(hist_filtered)
+                mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
+
+                results.add(f'gabor_entropy_image_source_{1 / 2 ** scale}x', entropy_source)
+                results.add(f'gabor_entropy_image_filtered_{1 / 2 ** scale}x', entropy_filtered)
+                results.add(f'gabor_mutual_image_information_{1 / 2 ** scale}x', mutual_information)
+
+            image = cv.pyrDown(image)
+            filtered = cv.pyrDown(filtered)
+            mask = cv.resize(mask, (image.shape[1], image.shape[0]), interpolation=cv.INTER_NEAREST)
 
 
 class GazeAccuracy(GazeMetric):
