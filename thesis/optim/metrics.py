@@ -107,17 +107,26 @@ class GaborEntropy(IrisMetric):
     def log(self, results: Logger, polar_image, polar_filtered, mask):
         angles = np.linspace(0, np.pi - np.pi/self.angles_per_scale, self.angles_per_scale)  # TODO: Consider subtracting small amount
         for scale in range(self.scales):
+            entropy_source = 0
+            entropy_filtered = 0
+            mutual_information = 0
+
             for theta in angles:
                 hist_source, hist_filtered, hist_joint = joint_gabor_histogram(polar_image, polar_filtered, mask,
                                                                                theta, self.histogram_divisions)
 
-                entropy_source = entropy(hist_source)
-                entropy_filtered = entropy(hist_filtered)
-                mutual_information = mutual_information_grad(hist_source, hist_filtered, hist_joint)
+                entropy_source += entropy(hist_source)
+                entropy_filtered += entropy(hist_filtered)
+                mutual_information += mutual_information_grad(hist_source, hist_filtered, hist_joint)
 
-                results.add(f'gabor_entropy_source_{1 / 2**scale}x', entropy_source)
-                results.add(f'gabor_entropy_filtered_{1 / 2**scale}x', entropy_filtered)
-                results.add(f'gabor_mutual_information_{1 / 2**scale}x', mutual_information)
+            # Hopefully fixed this to now be an actual AVERAGE of all the test angles at a given scale.
+            entropy_source /= self.angles_per_scale
+            entropy_filtered /= self.angles_per_scale
+            mutual_information /= self.angles_per_scale
+
+            results.add(f'gabor_entropy_source_{1 / 2**scale}x', entropy_source)
+            results.add(f'gabor_entropy_filtered_{1 / 2**scale}x', entropy_filtered)
+            results.add(f'gabor_mutual_information_{1 / 2**scale}x', mutual_information)
 
             polar_image = cv.pyrDown(polar_image)
             polar_filtered = cv.pyrDown(polar_filtered)

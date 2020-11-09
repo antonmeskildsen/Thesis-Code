@@ -50,8 +50,18 @@ def cauchy_noise(img, scale: float):
     return np.uint8(np.clip(img + rng.standard_cauchy(img.shape) * scale, 0, 255))
 
 
+def laplacian_noise(img, scale: float):
+    return np.uint8(np.clip(img + rng.laplace(scale=scale, size=img.shape), 0, 255))
+
+
 def salt_and_pepper(img, intensity: float, density: float):
-    mask = 1 - np.random.rand(*img.shape)
-    mask[mask > density] = 1
-    mask[mask <= density] = 0
+    mask = np.random.rand(*img.shape)
+    mask[mask > (1 - density)] = 1
+    mask[mask <= (1 - density)] = 0
     return np.uint8(np.clip(img + mask * np.random.uniform(intensity), 0, 255))
+
+
+def snow(img, density: float):
+    img = np.copy(img)
+    img[np.random.rand(*img.shape) > (1 - density)] = 127
+    return img
