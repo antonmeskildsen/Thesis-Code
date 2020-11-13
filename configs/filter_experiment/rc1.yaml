@@ -15,10 +15,14 @@ method: NaiveMultiObjectiveOptimizer
 metrics:
   gaze_metrics:
   - GazeAccuracy
-  iris_metrics:
-  - GradientEntropy
-  - GaborEntropy
+  image_metrics:
+  - GradientEntropyImage
+  - GaborEntropyImage
   - ImageSimilarity
+  iris_metrics:
+  - GradientEntropyIris
+  - GaborEntropyIris
+  - IrisDistance
   pupil_metrics:
   - PupilDetectionError
 metrics_config: configs/metrics/std.yaml
@@ -30,4 +34,4 @@ samples:
   iris: 50
   pupil: 50
 #strategy_config: configs/strategies/tester.yaml
-strategy_config: configs/strategies/27-10-20-linear.yaml
+strategy_config: configs/strategies/11-11-20-super.yaml
