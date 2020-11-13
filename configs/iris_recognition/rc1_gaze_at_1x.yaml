@@ -1,25 +1,31 @@
 dataset: /home/anton/data/eyedata/iris/casia4i.json
 filters:
   bilateral_filter:
-    sigma_c: 83.62068965517241
-    sigma_s: 12.137931034482758
+    sigma_c: 44.310344827586185
+    sigma_s: 17.37931034482758
     steps: 1.0
   gaussian_filter:
-    sigma: 4.545454
+    sigma: 1.5151515151515154
   gaussian_noise:
     loc: 0.0
-    scale: 79.797979797979
+    scale: 18.181818181818183
   mean_filter:
-    size: 7.0
+    size: 1
+  median_filter:
+    size: 5
   non_local_means:
-    h: 52.52525252525252
+    h: 8.080808080808081
   uniform_noise:
-    intensity: 222.2222222222
+    intensity: 80.80808080808082
   cauchy_noise:
-    scale: 37.62626262626263
+    scale: 2.484848484848485
+  laplacian_noise:
+    scale: 11.111111111111112
+  snow:
+    density: 0.029797979797979813
   salt_and_pepper:
-    intensity: 92.85714285714286
-    density: 0.49999999999999994
+    intensity: 131.89655172413785
+    density: 0.14999999999999994
 parameters:
   angles: 6
   epsilon: 0.0001

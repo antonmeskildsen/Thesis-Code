@@ -20,6 +20,7 @@ setuptools.setup(
     entry_points='''
         [console_scripts]
         data=thesis.tools.cli.data_tool:data
+        combine-results=thesis.tools.cli.combine_results:combine
         filter-exp=thesis.tools.cli.filter_experiment:main
     '''
 )

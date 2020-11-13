@@ -158,7 +158,7 @@ if st.checkbox('Individual bilaterals'):
 
 "# Optimal values"
 agg.reset_index(drop=True, inplace=True)
-m = agg.loc[agg.groupby('filter')['iris_code_similarity'].idxmin()]
+m = agg.loc[agg.groupby('filter')['gradient_mutual_information'].idxmin()]
 
 params = {
     'bilateral_filter': ['sigma_c', 'sigma_s'],
@@ -169,7 +169,10 @@ params = {
     'uniform_noise': ['intensity'],
     'gaussian_noise': ['loc', 'scale'],
     'cauchy_noise': ['scale'],
-    'salt_and_pepper': ['intensity', 'density']
+    'laplacian_noise': ['scale'],
+    'snow': ['density'],
+    'salt_and_pepper': ['intensity', 'density'],
+    'super_filter': ['sigma_c', 'sigma_s', 'scale']
 }
 
 out_params = {}

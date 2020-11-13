@@ -21,8 +21,8 @@ from thesis.segmentation import IrisImage, IrisSegmentation, SKImageIrisCodeEnco
 from thesis.data import SegmentationDataset
 from thesis.optim import filters
 
-# base = '/home/anton/data/eyedata/iris'
-base = '/Users/Anton/Desktop/data/iris'
+base = '/home/anton/data/eyedata/iris'
+# base = '/Users/Anton/Desktop/data/iris'
 
 
 def create_code(args):
