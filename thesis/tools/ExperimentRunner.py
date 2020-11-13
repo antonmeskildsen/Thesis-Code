@@ -23,7 +23,7 @@ from tools.cli.utilities import load_iris_data, load_gaze_data, load_pupil_data
 from thesis.optim.sampling import GridSearch, UniformSampler, Sampler, PopulationInitializer
 from thesis.optim import sampling
 from thesis.optim.filters import *
-from thesis.optim.metrics import GradientEntropyIris, GaborEntropyIris, GradientEntropyImage, GaborEntropyImage, ImageSimilarity, GazeAccuracy, PupilDetectionError
+from thesis.optim.metrics import GradientEntropyIris, GaborEntropyIris, GradientEntropyImage, GaborEntropyImage, IrisDistance, GazeAccuracy, PupilDetectionError
 from thesis.optim import metrics
 from thesis.optim.population import TruncationSelection, TournamentSelection, UniformCrossover, GaussianMutation
 
@@ -88,7 +88,7 @@ with open(config_metrics_file) as config_metrics:
 
 constructor_args = config_metrics['constructor_args']
 
-possible_iris_metrics = (GradientEntropyIris, GaborEntropyIris, ImageSimilarity)
+possible_iris_metrics = (GradientEntropyIris, GaborEntropyIris, IrisDistance)
 possible_image_metrics = (GradientEntropyImage, GaborEntropyImage)
 # iris_metrics_mask = [st.sidebar.checkbox(m.__name__) for m in possible_iris_metrics]
 iris_metrics = [T(**constructor_args[T.__name__]) for T in possible_iris_metrics if st.sidebar.checkbox(T.__name__)]

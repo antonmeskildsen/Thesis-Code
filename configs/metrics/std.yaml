@@ -3,11 +3,19 @@ polar_resolution:
   radial: 10
 
 constructor_args:
-  GradientEntropy:
+  GradientEntropyIris:
     histogram_divisions: 16
 
-  GaborEntropy:
-    scales: 5
+  GaborEntropyIris:
+    scales: 6
+    angles_per_scale: 3
+    histogram_divisions: 16
+
+  GradientEntropyImage:
+    histogram_divisions: 16
+
+  GaborEntropyImage:
+    scales: 6
     angles_per_scale: 3
     histogram_divisions: 16
 
@@ -18,7 +26,9 @@ constructor_args:
       - ElseDetector
       - DeepEyeDetector
 
-  ImageSimilarity:
+  IrisDistance:
     angles: 6
     scales: 4
     eps: 0.001
+
+  ImageSimilarity: {}
