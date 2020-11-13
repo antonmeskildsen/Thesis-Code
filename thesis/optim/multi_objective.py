@@ -13,7 +13,7 @@ from thesis.segmentation import IrisImage
 from thesis.data import SegmentationDataset, GazeDataset, PupilDataset
 from thesis.optim.pareto import dominates
 from thesis.optim.sampling import Sampler, PopulationInitializer
-from thesis.optim.metrics import IrisMetric, GazeMetric, PupilMetric, Logger
+from thesis.optim.metrics import IrisMetric, GazeMetric, PupilMetric, Logger, ImageMetric
 from thesis.optim.population import SelectionMethod, MutationMethod, CrossoverMethod
 from thesis.entropy import joint_gradient_histogram, entropy, mutual_information_grad, joint_gabor_histogram
 from thesis.optim.status import ProgressBar
@@ -54,6 +54,7 @@ class ObfuscationObjective(Objective):
     pupil_datasets: List[PupilDataset]
 
     iris_terms: List[IrisMetric]
+    image_terms: List[ImageMetric]
     gaze_terms: List[GazeMetric]
     pupil_terms: List[PupilMetric]
 
@@ -73,6 +74,9 @@ class ObfuscationObjective(Objective):
         for dataset in self.iris_datasets:
             for sample in random.sample(dataset.samples, samples_per_set):
                 output = self.filter(sample.image.image, **params)
+
+                for i, metric in enumerate(self.image_terms):
+                    metric.log(results, sample.image.image, output, sample.image.mask)
 
                 radial, angular = self.polar_image_resolution  # Should be: 1000, 100
                 polar, mask = sample.image.to_polar(angular, radial)

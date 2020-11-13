@@ -52,6 +52,7 @@ def main(config, name):
             return getattr(metrics, x)(**ag[x])
 
         iris_terms = list(map(do, dmetrics['iris_metrics']))
+        image_terms = list(map(do, dmetrics['image_metrics']))
         gaze_terms = list(map(do, dmetrics['gaze_metrics']))
         pupil_terms = list(map(do, dmetrics['pupil_metrics']))
 
@@ -78,8 +79,8 @@ def main(config, name):
             sampling = GridSearch
 
             for f in map(lambda f: getattr(filters, f), data['filters']):
-                objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, gaze_terms,
-                                                 pupil_terms, iris_samples, gaze_samples, pupil_samples,
+                objective = ObfuscationObjective(f, iris_data, gaze_data, pupil_data, iris_terms, image_terms,
+                                                 gaze_terms, pupil_terms, iris_samples, gaze_samples, pupil_samples,
                                                  data['polar_resolution'])
                 params, generators = json_to_strategy(strategy_config[f.__name__])
                 sampler: Sampler = sampling(params, generators)
