@@ -30,7 +30,8 @@ def fit_excuse_ref(img, debug=False):
 
 
 def create_deepeye_func():
-    path = '/Users/Anton/Documents/git/thesis/Thesis-Code/thesis/deepeye/models/default.ckpt'
+    # path = '/Users/Anton/Documents/git/thesis/Thesis-Code/thesis/deepeye/models/default.ckpt'
+    path = '/home/anton/git/thesis/Thesis-Code/thesis/deepeye/models/default.ckpt'
     deepeye_model = deepeye.DeepEye(model=path)
 
     def deepeye_ref(img, debug=False):

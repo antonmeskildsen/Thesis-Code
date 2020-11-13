@@ -6,6 +6,18 @@ from medpy.filter import smoothing
 rng = np.random.default_rng()
 
 
+def super_filter(img, sigma_c: float, sigma_s: float, scale: float, steps: int=1):
+    img = bilateral_filter(img, sigma_c, sigma_s, steps)
+    img = cauchy_noise(img, scale)
+    return img
+
+
+def super_filter_reverse(img, sigma_c: float, sigma_s: float, scale: float, steps: int=1):
+    img = cauchy_noise(img, scale)
+    img = bilateral_filter(img, sigma_c, sigma_s, steps)
+    return img
+
+
 def mean_filter(img, size):
     size = int(size)
     return cv.blur(img, (size, size))
