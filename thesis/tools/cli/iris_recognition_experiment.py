@@ -13,6 +13,7 @@ import cv2 as cv
 from tqdm import tqdm
 
 from multiprocessing import Pool
+from threading import Semaphore
 from itertools import repeat, product
 
 import seaborn as sns
@@ -41,13 +42,13 @@ def create_code(args):
 
 
 def compare(args):
-    (left, right), codes_left, codes_right, (i, j), num_rotations = args
+    (left, right), (code_left, code_right), (i, j), num_rotations = args
 
     same = False
     if left.user_id == right.user_id and left.eye == right.eye:
         same = True
 
-    distance = min([codes_left[i][num_rotations // 2].dist(cb) for cb in codes_right[j]])
+    distance = min([code_left[num_rotations // 2].dist(cb) for cb in code_right])
 
     return (i, j), (distance, same)
 
@@ -73,10 +74,10 @@ def compare(args):
 #     return distance_matrix, same_mask
 
 def run_test(args, n):
-    results = list(tqdm(map(compare, args), total=len(args)))
+    results = map(compare, args)
     distance_matrix = np.zeros((n, n))
     same_mask = np.zeros((n, n), np.bool)
-    for (i, j), (distance, same) in results:
+    for (i, j), (distance, same) in tqdm(results, total=n**2):
         distance_matrix[i, j] = distance
         same_mask[i, j] = same
 
@@ -100,7 +101,8 @@ def run_test(args, n):
 @click.argument('config')
 @click.argument('output')
 @click.option('--filter', '-f', is_flag=True, help='Apply filter configuration')
-def main(config, output, filter):
+@click.option('--compare-self/--compare-base', is_flag=True, default=False)
+def main(config, output, filter, compare_self):
     with open(os.path.join('configs/iris_recognition', f'{config}.yaml')) as file:
         config = yaml.safe_load(file)
 
@@ -154,7 +156,13 @@ def main(config, output, filter):
                 print('[INFO] codes created')
                 n = len(f_codes)
 
-                args = list(zip(comparison_samples, repeat(codes), repeat(f_codes), comparisons, repeat(num_rotations)))
+                if compare_self:
+                    code_pairs = [(codes[i], f_codes[j]) for i, j in comparisons]
+                    args = list(zip(comparison_samples, code_pairs, comparisons, repeat(num_rotations)))
+                else:
+                    code_pairs = [(codes[i], codes[j]) for i, j in comparisons]
+                    args = list(zip(comparison_samples, code_pairs, comparisons, repeat(num_rotations)))
+
                 inter_distance, intra_distances = run_test(args, n)
                 res[f] = {
                     'inter_distance': inter_distance,
@@ -163,7 +171,8 @@ def main(config, output, filter):
             print('[INFO] Filter comparisons done')
 
         print('[INFO] comparing base codes')
-        args = list(zip(comparison_samples, repeat(codes), repeat(codes), comparisons, repeat(num_rotations)))
+        code_pairs = [(codes[i], codes[j]) for i, j in comparisons]
+        args = zip(comparison_samples, code_pairs, comparisons, repeat(num_rotations))
         inter_distance, intra_distances = run_test(args, n)
         res['baseline'] = {
             'inter_distance': inter_distance,

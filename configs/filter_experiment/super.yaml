@@ -5,13 +5,17 @@ filters:
 method: NaiveMultiObjectiveOptimizer
 metrics:
   gaze_metrics:
-  - GazeAccuracy
+    - GazeAccuracy
+  image_metrics:
+    - GradientEntropyImage
+    - GaborEntropyImage
+    - ImageSimilarity
   iris_metrics:
-  - GradientEntropy
-  - GaborEntropy
-  - ImageSimilarity
+    - GradientEntropyIris
+    - GaborEntropyIris
+    - IrisDistance
   pupil_metrics:
-  - PupilDetectionError
+    - PupilDetectionError
 metrics_config: configs/metrics/std.yaml
 polar_resolution:
 - 10

@@ -54,10 +54,9 @@ def polar_base_loop(img, mask, radial_resolution, angular_resolution, angle_step
             # random_thetas_seed = np.random.uniform(0, 1, n_samples)
             # random_radii_seed = np.random.uniform(0, 1, n_samples)
             random_thetas_seed = np.linspace(0, 1, side_len).repeat(side_len)
-            random_radii_seed = np.zeros(side_len**2)
+            random_radii_seed = np.zeros(side_len ** 2)
             for x in range(side_len):
-                random_radii_seed[x:x+1] = x/side_len
-
+                random_radii_seed[x:x + 1] = x / side_len
 
             # random_thetas_seed = np.random.uniform(0, 1, n_samples)
             random_thetas = angle_steps[i] + random_thetas_seed * (angle_steps[i + 1] - angle_steps[i])
@@ -230,18 +229,23 @@ class IrisImage:
         return self.polar
 
 
+@jit(nopython=True)
+def cdist(a_code, a_mask, b_code, b_mask):
+    mask = a_mask | b_mask
+    n = mask.sum()
+    if n == a_code.size:
+        return 1
+    else:
+        return (a_code != b_code)[mask == 0].sum() / (a_code.size - n)
+
+
 @dataclass
 class IrisCode:
     code: np.ndarray
     mask: np.ndarray
 
     def dist(self, other):
-        mask = self.mask | other.mask
-        n = mask.sum()
-        if n == len(self):
-            return 1
-        else:
-            return (self.code != other.code)[mask == 0].sum() / (len(self) - n)
+        return cdist(self.code, self.mask, other.code, other.mask)
 
     def __len__(self):
         return self.code.size
