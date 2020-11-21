@@ -25,8 +25,8 @@ from thesis.tools.st_utils import type_name
 
 "# Explorer"
 
-base = '/home/anton/data/eyedata/iris'
-# base = '/Users/Anton/Desktop/data/iris'
+# base = '/home/anton/data/eyedata/iris'
+base = '/Users/Anton/Desktop/data/iris'
 
 files = glob(os.path.join(base, '*.json'))
 names = [os.path.basename(p).split('.')[0] for p in files]
