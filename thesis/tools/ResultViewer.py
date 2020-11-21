@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import tikzplotlib
 from mpl_toolkits.mplot3d import Axes3D
 from collections import defaultdict
 
@@ -91,6 +90,8 @@ type_map = {k: types[v] for k, v in {
     'laplacian_noise': 'noise',
     'snow': 'noise',
     'salt_and_pepper': 'noise',
+    'super_filter': 'combo',
+    'super_filter_reverse': 'combo'
 }.items()}
 
 agg['Type'] = agg['filter'].apply(type_map.get)
@@ -107,27 +108,47 @@ filter_name_map = {
     'laplacian_noise': 'Laplacian noise',
     'snow': 'Snow noise',
     'salt_and_pepper': 'Salt-and-pepper noise',
+    'super_filter': 'Super filter',
+    'super_filter_reverse': 'Reverse super filter'
 }
 
 pretty_name_map = {
-    'gradient_entropy_source': 'Entropy of source  - gradient method',
-    'gradient_entropy_filtered': 'Entropy of result - gradient method',
-    'gradient_mutual_information': 'Mutual information - gradient method',
-    'gabor_entropy_source_1.0x': 'Entropy of source - gabor method (3px)',
-    'gabor_entropy_source_0.5x': 'Entropy of source - gabor method (6px)',
-    'gabor_entropy_source_0.25x': 'Entropy of source - gabor method (12px)',
-    'gabor_entropy_source_0.125x': 'Entropy of source - gabor method (24px)',
-    'gabor_entropy_source_0.0625x': 'Entropy of source - gabor method (48px)',
-    'gabor_entropy_filtered_1.0x': 'Entropy of result - gabor method (3px)',
-    'gabor_entropy_filtered_0.5x': 'Entropy of result - gabor method (6px)',
-    'gabor_entropy_filtered_0.25x': 'Entropy of result - gabor method (12px)',
-    'gabor_entropy_filtered_0.125x': 'Entropy of result - gabor method (24px)',
-    'gabor_entropy_filtered_0.0625x': 'Entropy of result - gabor method (48px)',
-    'gabor_mutual_information_1.0x': 'Mutual information - gabor method (3px)',
-    'gabor_mutual_information_0.5x': 'Mutual information - gabor method (6px)',
-    'gabor_mutual_information_0.25x': 'Mutual information - gabor method (12px)',
-    'gabor_mutual_information_0.125x': 'Mutual information - gabor method (24px)',
-    'gabor_mutual_information_0.0625x': 'Mutual information - gabor method (48px)',
+    'gradient_entropy_iris_source': 'Entropy of source  - gradient method',
+    'gradient_entropy_iris_filtered': 'Entropy of result - gradient method',
+    'gradient_mutual_information_iris': 'Mutual information - gradient method',
+    'gabor_entropy_iris_source_1.0x': 'Entropy of source - gabor method (3px)',
+    'gabor_entropy_iris_source_0.5x': 'Entropy of source - gabor method (6px)',
+    'gabor_entropy_iris_source_0.25x': 'Entropy of source - gabor method (12px)',
+    'gabor_entropy_iris_source_0.125x': 'Entropy of source - gabor method (24px)',
+    'gabor_entropy_iris_source_0.0625x': 'Entropy of source - gabor method (48px)',
+    'gabor_entropy_iris_filtered_1.0x': 'Entropy of result - gabor method (3px)',
+    'gabor_entropy_iris_filtered_0.5x': 'Entropy of result - gabor method (6px)',
+    'gabor_entropy_iris_filtered_0.25x': 'Entropy of result - gabor method (12px)',
+    'gabor_entropy_iris_filtered_0.125x': 'Entropy of result - gabor method (24px)',
+    'gabor_entropy_iris_filtered_0.0625x': 'Entropy of result - gabor method (48px)',
+    'gabor_mutual_information_iris_1.0x': 'Mutual information - gabor method (3px)',
+    'gabor_mutual_information_iris_0.5x': 'Mutual information - gabor method (6px)',
+    'gabor_mutual_information_iris_0.25x': 'Mutual information - gabor method (12px)',
+    'gabor_mutual_information_iris_0.125x': 'Mutual information - gabor method (24px)',
+    'gabor_mutual_information_iris_0.0625x': 'Mutual information - gabor method (48px)',
+    'gradient_entropy_image_source': 'Entropy of source  - gradient method',
+    'gradient_entropy_image_filtered': 'Entropy of result - gradient method',
+    'gradient_mutual_information_image': 'Mutual information - gradient method',
+    'gabor_entropy_image_source_1.0x': 'Entropy of source - gabor method (3px)',
+    'gabor_entropy_image_source_0.5x': 'Entropy of source - gabor method (6px)',
+    'gabor_entropy_image_source_0.25x': 'Entropy of source - gabor method (12px)',
+    'gabor_entropy_image_source_0.125x': 'Entropy of source - gabor method (24px)',
+    'gabor_entropy_image_source_0.0625x': 'Entropy of source - gabor method (48px)',
+    'gabor_entropy_image_filtered_1.0x': 'Entropy of result - gabor method (3px)',
+    'gabor_entropy_image_filtered_0.5x': 'Entropy of result - gabor method (6px)',
+    'gabor_entropy_image_filtered_0.25x': 'Entropy of result - gabor method (12px)',
+    'gabor_entropy_image_filtered_0.125x': 'Entropy of result - gabor method (24px)',
+    'gabor_entropy_image_filtered_0.0625x': 'Entropy of result - gabor method (48px)',
+    'gabor_mutual_information_image_1.0x': 'Mutual information - gabor method (3px)',
+    'gabor_mutual_information_image_0.5x': 'Mutual information - gabor method (6px)',
+    'gabor_mutual_information_image_0.25x': 'Mutual information - gabor method (12px)',
+    'gabor_mutual_information_image_0.125x': 'Mutual information - gabor method (24px)',
+    'gabor_mutual_information_image_0.0625x': 'Mutual information - gabor method (48px)',
     'iris_code_similarity': 'Iris code similarity',
     'image_normalized_similarity': 'Image similarity',
     'gaze_angle_error_source': 'Gaze error source',
@@ -245,8 +266,8 @@ if st.checkbox('Pareto'):
     if st.button('Export performance'):
         fig.savefig(path, bbox_inches="tight")
 
-    if st.button('Export latex'):
-        tikzplotlib.save(path, figure=fig, standalone=True)
+    # if st.button('Export latex'):
+    #     tikzplotlib.save(path, figure=fig, standalone=True)
 
     pareto_optimal = pd.concat(rows)
 # st.write(pareto_optimal)
@@ -369,9 +390,9 @@ if st.checkbox('Metrics'):
 # st.pyplot(fig)
 
 #
-cols = ['gaze_relative_error', 'iris_code_similarity', 'gradient_mutual_information', 'gabor_mutual_information_1.0x',
-        'gabor_mutual_information_0.5x',
-        'gabor_mutual_information_0.25x', 'gabor_mutual_information_0.125x', 'gabor_mutual_information_0.0625x']
+cols = ['gaze_relative_error', 'iris_code_similarity', 'gradient_mutual_information_iris', 'gabor_mutual_information_iris_1.0x',
+        'gabor_mutual_information_iris_0.5x',
+        'gabor_mutual_information_iris_0.25x', 'gabor_mutual_information_iris_0.125x', 'gabor_mutual_information_iris_0.0625x']
 #cols = map(pretty_name_map.get, cols)
 vars = frame[cols]
 
