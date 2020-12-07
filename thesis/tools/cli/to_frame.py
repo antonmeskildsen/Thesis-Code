@@ -9,23 +9,6 @@ import pandas as pd
 
 
 @njit
-def metrics(intra, inter, t):
-    tp = (intra <= t).sum()
-    tn = (inter > t).sum()
-    fp = (inter <= t).sum()
-    fn = (intra > t).sum()
-    return {
-        'threshold': t,
-        'tp': tp,
-        'tn': tn,
-        'fp': fp,
-        'fn': fn,
-        'far': fp / (fp + tn),
-        'frr': fn / (fn + tp)
-    }
-
-
-@njit
 def find_gt(sorted_array, value, start=0):
     i = start
     while i < len(sorted_array):
@@ -46,7 +29,10 @@ def process_file(data):
             l['name'] = spec
         res.extend(ls)
 
+    return res
 
+
+@njit
 def line(intra, inter):
     res = []
 
@@ -56,8 +42,9 @@ def line(intra, inter):
     n_inter = len(inter)
     intra_idx = 0
     inter_idx = 0
-    for i in prange(100):
-        x = i / 100
+    N = 10000
+    for i in range(N):
+        x = i / N
 
         intra_idx = find_gt(sorted_intra, x, intra_idx)
         inter_idx = find_gt(sorted_inter, x, inter_idx)
@@ -96,7 +83,7 @@ filter_name_map = {
 
 @click.command()
 @click.argument('path')
-@click.argument('prefix')
+@click.argument('scale')
 def convert(path, scale):
     in_path = f'{path}.json'
     out_path = f'{path}.pkl'
