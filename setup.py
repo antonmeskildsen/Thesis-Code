@@ -8,14 +8,13 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         'numpy',
-        'pupilfit',
         'scikit-image',
         'scipy',
         'matplotlib',
         'streamlit',
         'pandas',
         'seaborn',
-        'Click'
+        'click'
     ],
     entry_points='''
         [console_scripts]
