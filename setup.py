@@ -8,14 +8,13 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     install_requires=[
         'numpy',
-        'pupilfit',
         'scikit-image',
         'scipy',
         'matplotlib',
         'streamlit',
         'pandas',
         'seaborn',
-        'Click'
+        'click'
     ],
     entry_points='''
         [console_scripts]
@@ -23,5 +22,6 @@ setuptools.setup(
         combine-results=thesis.tools.cli.combine_results:combine
         filter-exp=thesis.tools.cli.filter_experiment:main
         to-frame=thesis.tools.cli.to_frame:convert
+        iris-res-compress=thesis.tools.cli.iris_res_compress:compress
     '''
 )

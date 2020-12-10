@@ -13,8 +13,8 @@ from thesis.segmentation import IrisImage
 from thesis.tracking.gaze import GazeModel, BasicGaze
 from thesis.tracking.features import normalize_coordinates, pupil_detector
 
-from thesis.tools.st_utils import fit_else_ref, create_deepeye_func
-deepeye_ref = create_deepeye_func()
+from thesis.tools.st_utils import fit_else_ref #, create_deepeye_func
+deepeye_ref = fit_else_ref #create_deepeye_func()
 
 
 @dataclass

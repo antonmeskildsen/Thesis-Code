@@ -119,6 +119,8 @@ encoder = SKImageIrisCodeEncoder(6, 100, 10, 4, 0.001, n_samples=100)
 base_code = encoder.encode(iris_img)
 filter_code = encoder.encode(filter_img)
 
+st.write(base_code.code.size)
+
 bins = 50
 div = 64
 
